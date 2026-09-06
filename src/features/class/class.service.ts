@@ -9,7 +9,6 @@ import { DRIZZLE } from '../../database/database.module';
 import { Inject } from '@nestjs/common';
 import { drizzle } from 'drizzle-orm/postgres-js';
 import { ClassRepository } from './class.repository';
-import { NotificationService } from '../notification/notification.service';
 import {
   AddStudentsDto,
   CreateClassDto,
@@ -27,7 +26,6 @@ export class ClassService {
     private readonly repo: ClassRepository,
     @Inject(DRIZZLE)
     private readonly db: ReturnType<typeof drizzle>,
-    private readonly notificationService: NotificationService,
     private readonly user: UserService,
   ) {}
 
@@ -194,21 +192,6 @@ export class ClassService {
 
     const inserted = await this.repo.addStudents({ classId, studentIds });
     const addedIds = inserted.map((row) => row.studentId);
-
-    // notify each newly-enrolled student they were added to the class
-    for (const studentId of addedIds) {
-      void this.notificationService.createInternal({
-        type: 'STUDENT',
-        senderId: userId,
-        userId: studentId,
-        studentId,
-        classId,
-        title: 'Bạn được thêm vào lớp mới',
-        content: `Bạn đã được thêm vào lớp ${classData.name}.`,
-        actionType: 'VIEW',
-        actionLabel: 'Xem lớp học',
-      });
-    }
 
     return {
       classId,

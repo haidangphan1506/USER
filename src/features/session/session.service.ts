@@ -11,7 +11,6 @@ import { SessionRepository } from './session.repository';
 import { ClassService } from '../class/class.service';
 import { LessonService } from '../lesson/lesson.service';
 import { UserService } from '../user/user.service';
-import { NotificationService } from '../notification/notification.service';
 
 @Injectable()
 export class SessionService {
@@ -21,42 +20,7 @@ export class SessionService {
     private readonly classService: ClassService,
     private readonly lessonService: LessonService,
     private readonly userService: UserService,
-    private readonly notificationService: NotificationService,
   ) {}
-
-  // fan-out a notification to every student enrolled in the class
-  private async notifyClassStudents({
-    userId,
-    classId,
-    className,
-    content,
-  }: {
-    userId: string;
-    classId: string;
-    className: string;
-    content: string;
-  }) {
-    try {
-      const students = await this.classService.getAllStudentsService({ userId, id: classId });
-      for (const student of students) {
-        void this.notificationService.createInternal({
-          type: 'SYSTEM',
-          senderId: userId,
-          userId: student.id,
-          studentId: student.id,
-          classId,
-          title: `Buổi học mới · ${className}`,
-          content,
-          actionType: 'VIEW',
-          actionLabel: 'Xem buổi học',
-        });
-      }
-    } catch (err) {
-      this.logger.warn(
-        `Failed to notify class students: ${err instanceof Error ? err.message : String(err)}`,
-      );
-    }
-  }
 
   // todo : validate optional lesson/tutor FKs before insert, defaulting tutor to the acting user ...
   private async resolveSessionRefs({
@@ -129,19 +93,13 @@ export class SessionService {
     if (!userId || !checkUuidValid({ data: userId }))
       throw new BadRequestException(ERROR_MESSAGES.USER_ID_MUST_BE_UUID);
 
-    const classData = await this.assertClassOwner({ userId, classId: data.classId });
+    await this.assertClassOwner({ userId, classId: data.classId });
     const refs = await this.resolveSessionRefs({
       userId,
       lessonId: data.lessonId,
       tutorId: data.tutorId,
     });
     const created = await this.repo.create({ data: { ...data, ...refs } });
-    void this.notifyClassStudents({
-      userId,
-      classId: data.classId,
-      className: classData.name,
-      content: `Lớp ${classData.name} vừa có buổi học mới. Xem lịch để không bỏ lỡ.`,
-    });
     return created;
   }
 
@@ -149,7 +107,7 @@ export class SessionService {
     if (!userId || !checkUuidValid({ data: userId }))
       throw new BadRequestException(ERROR_MESSAGES.USER_ID_MUST_BE_UUID);
 
-    const classData = await this.assertClassOwner({ userId, classId: data.classId });
+    await this.assertClassOwner({ userId, classId: data.classId });
     const items = await Promise.all(
       data.sessions.map(async (session) => ({
         ...session,
@@ -161,12 +119,6 @@ export class SessionService {
       })),
     );
     const created = await this.repo.createMany({ classId: data.classId, items });
-    void this.notifyClassStudents({
-      userId,
-      classId: data.classId,
-      className: classData.name,
-      content: `Lớp ${classData.name} vừa được thêm ${items.length} buổi học mới. Xem lịch để không bỏ lỡ.`,
-    });
     return created;
   }
 

@@ -21,12 +21,9 @@ import {
   type JwtRefreshPayload,
   type JwtTokensConfig,
 } from '@packages/helpers';
-import { EmailService } from '../email/email.service';
 import { UserService } from '../user/user.service';
 import { getJwtTokensConfig } from '@packages/configs/jwt-sign.config';
-import type { User } from '@packages/entities/user';
 import { randomUUID } from 'node:crypto';
-import { RedisService } from 'src/features/redis/redis.service';
 import { checkUuidValid, type JwtUserRole } from '@packages/helpers';
 import { CurrentUser } from '@packages/decorators';
 import type { FacebookProfile, GoogleProfile } from '@packages/strategy';
@@ -48,13 +45,8 @@ function parseRefreshTokenPayload(value: unknown): JwtRefreshPayload {
 @Injectable()
 export class AuthService {
   private readonly jwtTokensConfig: JwtTokensConfig;
-  private readonly ACCESS_TOKEN_REDIS_PREFIX = 'access_token_';
-  private readonly PASSWORD_RESET_REDIS_PREFIX = 'password_reset_';
-  private readonly BLACK_LIST_TOKEN_REDIS_PREFIX = 'black_list_token_';
   constructor(
     private readonly userService: UserService,
-    private readonly redis: RedisService,
-    private readonly emailService: EmailService,
     private readonly jwtService: JwtService,
     configService: ConfigService,
   ) {
@@ -131,8 +123,6 @@ export class AuthService {
       signRefreshToken(this.jwtService, { sub: user.id, email: user.email }, this.jwtTokensConfig),
     ]);
 
-    await this.redis.set(`${this.ACCESS_TOKEN_REDIS_PREFIX}:${user.id}`, refreshToken, 604800);
-
     return {
       accessToken,
       refreshToken,
@@ -162,8 +152,6 @@ export class AuthService {
       signRefreshToken(this.jwtService, { sub: user.id, email: user.email }, this.jwtTokensConfig),
     ]);
 
-    await this.redis.set(`${this.ACCESS_TOKEN_REDIS_PREFIX}:${user.id}`, refreshToken, 604800);
-
     return {
       accessToken,
       refreshToken,
@@ -183,7 +171,10 @@ export class AuthService {
         lastName: profile.lastName,
         role: 'STUDENT',
       });
-      const createdRows = await this.userService.getUserByField({ field: 'email', value: profile.email });
+      const createdRows = await this.userService.getUserByField({
+        field: 'email',
+        value: profile.email,
+      });
       user = createdRows[0];
       if (!user) throw new BadRequestException(ERROR_MESSAGES.FAILED_TO_CREATE_USER);
     }
@@ -193,9 +184,12 @@ export class AuthService {
       signAccessToken(this.jwtService, payload, this.jwtTokensConfig),
       signRefreshToken(this.jwtService, { sub: user.id, email: user.email }, this.jwtTokensConfig),
     ]);
-    await this.redis.set(`${this.ACCESS_TOKEN_REDIS_PREFIX}:${user.id}`, refreshToken, 604800);
 
-    return { accessToken, refreshToken, user: { id: user.id, email: user.email, userCode: user.userCode, username: user.username } };
+    return {
+      accessToken,
+      refreshToken,
+      user: { id: user.id, email: user.email, userCode: user.userCode, username: user.username },
+    };
   }
 
   async googleLoginService(profile: GoogleProfile): Promise<LoginResponseDto> {
@@ -229,8 +223,6 @@ export class AuthService {
       signRefreshToken(this.jwtService, { sub: user.id, email: user.email }, this.jwtTokensConfig),
     ]);
 
-    await this.redis.set(`${this.ACCESS_TOKEN_REDIS_PREFIX}:${user.id}`, refreshToken, 604800);
-
     return {
       accessToken,
       refreshToken,
@@ -238,59 +230,13 @@ export class AuthService {
     };
   }
 
-  async forgotPasswordService(
-    forgotPasswordDto: ForgotPasswordDto,
-  ): Promise<ForgotPasswordResponseDto> {
-    const [user] = await this.userService.getUserByField({
-      field: 'email',
-      value: forgotPasswordDto.email,
-    });
-    if (!user) {
-      throw new BadRequestException(ERROR_MESSAGES.USER_NOT_FOUND);
-    }
-
-    const resetToken = randomUUID();
-    await this.redis.set(`${this.PASSWORD_RESET_REDIS_PREFIX}${resetToken}`, user.id, 300);
-    const displayName = `${user.firstName} ${user.lastName}`.trim() || user.email;
-    await this.emailService.sendForgotPasswordMail({
-      to: user.email,
-      resetToken,
-      displayName,
-    });
-
-    return { ok: true };
+  // password reset requires the redis token store + email sender, both removed for now
+  forgotPasswordService(_forgotPasswordDto: ForgotPasswordDto): Promise<ForgotPasswordResponseDto> {
+    throw new BadRequestException(ERROR_MESSAGES.FEATURE_NOT_AVAILABLE);
   }
 
-  async resetPasswordService(
-    resetPasswordDto: ResetPasswordDto,
-  ): Promise<ResetPasswordResponseDto> {
-    const { jti, password } = resetPasswordDto;
-    const userId = await this.redis.get(`${this.PASSWORD_RESET_REDIS_PREFIX}${jti}`);
-    if (!userId) {
-      throw new BadRequestException(ERROR_MESSAGES.INVALID_RESET_PASSWORD_TOKEN);
-    }
-
-    const user: User[] = await this.userService.getUserByField({
-      field: 'id',
-      value: userId,
-    });
-    if (!Array.isArray(user) || user.length === 0) {
-      throw new BadRequestException(ERROR_MESSAGES.USER_NOT_FOUND);
-    }
-
-    if (user[0].isActive === false) {
-      throw new BadRequestException(ERROR_MESSAGES.USER_NOT_ACTIVE);
-    }
-
-    const updatedUser = await this.userService.updateUserPasswordService({
-      id: userId,
-      password,
-    });
-    if (!updatedUser) {
-      throw new BadRequestException(ERROR_MESSAGES.FAILED_TO_RESET_PASSWORD);
-    }
-    await this.redis.del(`${this.PASSWORD_RESET_REDIS_PREFIX}${jti}`);
-    return { ok: true };
+  resetPasswordService(_resetPasswordDto: ResetPasswordDto): Promise<ResetPasswordResponseDto> {
+    throw new BadRequestException(ERROR_MESSAGES.FEATURE_NOT_AVAILABLE);
   }
 
   async updateUserPasswordService({ userId, password }: { userId: string; password: string }) {
@@ -349,16 +295,11 @@ export class AuthService {
     };
   }
 
-  // TODO: logout user ...
-  async logoutService(@CurrentUser() user: Record<string, string>) {
+  // stateless logout: no server-side token blacklist without redis, client just discards the token
+  logoutService(@CurrentUser() user: Record<string, string>) {
     if (!user.id || !checkUuidValid({ data: user.id })) {
       throw new BadRequestException(ERROR_MESSAGES.INVALID_USER_ID);
     }
-    const blackListToken = await this.redis.get(`${this.BLACK_LIST_TOKEN_REDIS_PREFIX}${user.id}`);
-    if (blackListToken) {
-      throw new BadRequestException(ERROR_MESSAGES.USER_ALREADY_LOGGED_OUT);
-    }
-    await this.redis.set(`${this.BLACK_LIST_TOKEN_REDIS_PREFIX}${user.id}`, user.id, 604800);
     return { ok: true };
   }
 }

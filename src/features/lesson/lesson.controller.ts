@@ -1,16 +1,4 @@
-import {
-  Body,
-  Controller,
-  Delete,
-  Get,
-  HttpCode,
-  Param,
-  Post,
-  Put,
-  Query,
-  UploadedFile,
-  UseInterceptors,
-} from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpCode, Param, Post, Put, Query } from '@nestjs/common';
 import {
   ApiTags,
   ApiOperation,
@@ -19,24 +7,19 @@ import {
   ApiBody,
   ApiParam,
   ApiQuery,
-  ApiConsumes,
 } from '@nestjs/swagger';
-import { ApiResponse, CurrentUser } from '@packages/decorators';
+import { ApiResponse } from '@packages/decorators';
 import { StatusCodes } from 'http-status-codes';
 import {
   type CreateLessonBodyDto,
   type UpdateLessonDto,
   type GetLessonsQueryDto,
-  type RemoveLessonFileDto,
   createLessonBodySchema,
   updateLessonSchema,
   getLessonsQuerySchema,
-  removeLessonFileSchema,
 } from '@packages/entities';
 import { LessonService } from './lesson.service';
 import { ZodValidationPipe } from '@packages/pipes';
-import { FileInterceptor } from '@nestjs/platform-express';
-import type { MulterFile } from '../uploads/upload.interface';
 
 @ApiTags('Lesson')
 @ApiBearerAuth('access-token')
@@ -146,112 +129,5 @@ export class LessonController {
   @ApiResponse({ statusCode: StatusCodes.OK, message: 'Delete lesson successfully' })
   async deleteLessonController(@Param('id') id: string) {
     return await this.lessonService.deleteLessonService({ id });
-  }
-
-  @Put(':id/add-theory')
-  @HttpCode(StatusCodes.OK)
-  @ApiOperation({ summary: 'Update lesson' })
-  @UseInterceptors(FileInterceptor('file'))
-  @ApiBody({
-    schema: {
-      type: 'object',
-      required: ['file'],
-      properties: {
-        file: { type: 'string', format: 'binary' },
-      },
-    },
-  })
-  @SwaggerResponse({ status: StatusCodes.OK, description: 'Update lesson' })
-  @ApiConsumes('multipart/form-data')
-  @ApiResponse({ statusCode: StatusCodes.OK, message: 'Update lesson successfully' })
-  async addTheoryToLessionController(
-    @Param('id') id: string,
-    @UploadedFile() file: MulterFile,
-    @CurrentUser() user: Record<string, string>,
-  ) {
-    return await this.lessonService.addTheoryToLessonService({ userId: user?.id, id, data: file });
-  }
-
-  @Put(':id/exercises')
-  @HttpCode(StatusCodes.OK)
-  @ApiOperation({ summary: 'Update lesson' })
-  @UseInterceptors(FileInterceptor('file'))
-  @ApiBody({
-    schema: {
-      type: 'object',
-      required: ['file'],
-      properties: {
-        file: { type: 'string', format: 'binary' },
-      },
-    },
-  })
-  @SwaggerResponse({ status: StatusCodes.OK, description: 'Update lesson' })
-  @ApiConsumes('multipart/form-data')
-  @ApiResponse({ statusCode: StatusCodes.OK, message: 'Update lesson successfully' })
-  async addExercisesToLessionController(
-    @Param('id') id: string,
-    @UploadedFile() file: MulterFile,
-    @CurrentUser() user: Record<string, string>,
-  ) {
-    return await this.lessonService.addExercisesToLessonService({
-      userId: user?.id,
-      id,
-      data: file,
-    });
-  }
-
-  @Delete(':id/add-theory')
-  @HttpCode(StatusCodes.OK)
-  @ApiOperation({ summary: 'Remove a theory file from a lesson' })
-  @ApiParam({ name: 'id', description: 'Lesson ID', type: 'string' })
-  @ApiBody({
-    schema: {
-      type: 'object',
-      properties: {
-        url: { type: 'string', example: 'https://cdn.example.com/theory.pdf' },
-        key: { type: 'string', example: 'uploads/theory/uuid.pdf' },
-      },
-    },
-  })
-  @SwaggerResponse({ status: StatusCodes.OK, description: 'Remove a theory file from a lesson' })
-  @ApiResponse({ statusCode: StatusCodes.OK, message: 'Remove theory file successfully' })
-  async removeTheoryFromLessonController(
-    @Param('id') id: string,
-    @Body(new ZodValidationPipe<RemoveLessonFileDto>(removeLessonFileSchema))
-    data: RemoveLessonFileDto,
-    @CurrentUser() user: Record<string, string>,
-  ) {
-    return await this.lessonService.removeTheoryFromLessonService({ userId: user?.id, id, data });
-  }
-
-  @Delete(':id/exercises')
-  @HttpCode(StatusCodes.OK)
-  @ApiOperation({ summary: 'Remove an exercise file from a lesson' })
-  @ApiParam({ name: 'id', description: 'Lesson ID', type: 'string' })
-  @ApiBody({
-    schema: {
-      type: 'object',
-      properties: {
-        url: { type: 'string', example: 'https://cdn.example.com/exercise.pdf' },
-        key: { type: 'string', example: 'uploads/exercises/uuid.pdf' },
-      },
-    },
-  })
-  @SwaggerResponse({
-    status: StatusCodes.OK,
-    description: 'Remove an exercise file from a lesson',
-  })
-  @ApiResponse({ statusCode: StatusCodes.OK, message: 'Remove exercise file successfully' })
-  async removeExerciseFromLessonController(
-    @Param('id') id: string,
-    @Body(new ZodValidationPipe<RemoveLessonFileDto>(removeLessonFileSchema))
-    data: RemoveLessonFileDto,
-    @CurrentUser() user: Record<string, string>,
-  ) {
-    return await this.lessonService.removeExerciseFromLessonService({
-      userId: user?.id,
-      id,
-      data,
-    });
   }
 }

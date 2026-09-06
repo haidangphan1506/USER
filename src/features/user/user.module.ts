@@ -5,10 +5,9 @@ import { UserRepository } from './user.repository';
 import { UserService } from './user.service';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
-import { UploadModule } from '../uploads/upload.module';
 
 @Module({
-  imports: [UploadModule],
+  imports: [],
   controllers: [UserController],
   providers: [UserService, UserRepository, JwtAuthGuard, RolesGuard, JwtService, ConfigService],
   exports: [UserService],

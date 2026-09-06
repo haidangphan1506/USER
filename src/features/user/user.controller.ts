@@ -1,16 +1,4 @@
-import {
-  Body,
-  Controller,
-  Delete,
-  Get,
-  HttpCode,
-  Param,
-  Post,
-  Put,
-  Query,
-  UploadedFile,
-  UseInterceptors,
-} from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpCode, Param, Post, Put, Query } from '@nestjs/common';
 import {
   ApiTags,
   ApiOperation,
@@ -19,9 +7,7 @@ import {
   ApiParam,
   ApiResponse as SwaggerResponse,
   ApiBearerAuth,
-  ApiConsumes,
 } from '@nestjs/swagger';
-import { FileInterceptor } from '@nestjs/platform-express';
 import { StatusCodes } from 'http-status-codes';
 import { ZodValidationPipe } from '@packages/pipes';
 import { CurrentUser } from '@packages/decorators';
@@ -41,7 +27,6 @@ import {
 import { UserService } from './user.service';
 import { USER_SWAGGER_MESSAGES } from 'src/data/swaggers/messages';
 import { USER_SWAGGERS_DATA } from 'src/data/swaggers/data/user.swagger';
-import { type MulterFile } from '../uploads/upload.interface';
 
 type GetUsersResponse = Awaited<ReturnType<UserService['getUsersService']>>;
 
@@ -196,26 +181,6 @@ export class UserController {
   })
   async deleteUserByAdminController(@Param('id') id: string) {
     return await this.userService.deleteUserByAdminService({ id: id });
-  }
-
-  @Post('avatar')
-  @UseInterceptors(FileInterceptor('avatar'))
-  @HttpCode(StatusCodes.CREATED)
-  @ApiOperation({
-    summary: USER_SWAGGER_MESSAGES.UPLOAD_AVATAR_SUCCESSFULLY,
-    description: USER_SWAGGER_MESSAGES.UPLOAD_AVATAR_SUCCESSFULLY,
-  })
-  @ApiConsumes('multipart/form-data')
-  @ApiBody({ schema: USER_SWAGGERS_DATA.AVATAR_UPLOAD_SCHEMA })
-  @SwaggerResponse({
-    status: StatusCodes.CREATED,
-    description: USER_SWAGGER_MESSAGES.UPLOAD_AVATAR_SUCCESSFULLY,
-  })
-  uploadAvatarController(
-    @CurrentUser() user: Record<string, string>,
-    @UploadedFile() file: MulterFile,
-  ) {
-    return this.userService.uploadAvatarService(user.id, file);
   }
 
   @Post('change-password')

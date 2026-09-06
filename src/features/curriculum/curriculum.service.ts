@@ -9,7 +9,6 @@ import {
 import { ERROR_MESSAGES } from 'src/data/constants';
 import { CurriculumRepository } from './curriculum.repository';
 import { UserService } from '../user/user.service';
-import { UploadService } from '../uploads/upload.service';
 import { drizzle } from 'drizzle-orm/singlestore';
 import { DRIZZLE } from 'src/database/database.module';
 import { type GetCurriculumsQueryDto, type CreateCurriculumDto } from '@packages/entities';
@@ -21,7 +20,6 @@ export class CurriculumService {
   constructor(
     private readonly curriculumRepository: CurriculumRepository,
     private readonly userService: UserService,
-    private readonly uploadService: UploadService,
     @Inject(DRIZZLE)
     private readonly db: ReturnType<typeof drizzle>,
   ) {}
@@ -159,23 +157,6 @@ export class CurriculumService {
 
     const existing = await this.curriculumRepository.findById(id);
     if (!existing) throw new NotFoundException(ERROR_MESSAGES.CURRICULUM_NOT_FOUND);
-
-    const details = await this.curriculumRepository.findByIdWithDetails(id);
-    if (details) {
-      const allLessons = [
-        ...(details.lessons ?? []),
-        ...(details.chapters ?? []).flatMap((ch) => ch.lessons ?? []),
-      ];
-
-      const fileKeys = allLessons.flatMap((lesson) => [
-        ...(lesson.theoryUrls ?? []).map((f) => f.key),
-        ...(lesson.exerciseUrls ?? []).map((f) => f.key),
-      ]);
-
-      if (fileKeys.length > 0) {
-        await Promise.allSettled(fileKeys.map((key) => this.uploadService.delete(key)));
-      }
-    }
 
     return await this.curriculumRepository.delete(id);
   }

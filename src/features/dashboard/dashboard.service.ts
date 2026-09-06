@@ -7,7 +7,6 @@ import {
   type TodayScheduleRow,
 } from './dashboard.repository';
 import { UserService } from '../user/user.service';
-import { NotificationService } from '../notification/notification.service';
 
 export interface DashboardOverview {
   role: string;
@@ -25,7 +24,6 @@ export interface DashboardOverview {
   todaySchedule: TodayScheduleRow[];
   upcomingSchedule: TodayScheduleRow[];
   monthly: MonthlyRow[];
-  recentNotifications: unknown[];
 }
 
 @Injectable()
@@ -33,7 +31,6 @@ export class DashboardService {
   constructor(
     private readonly repo: DashboardRepository,
     private readonly userService: UserService,
-    private readonly notificationService: NotificationService,
   ) {}
 
   private startOfDay(d: Date) {
@@ -131,9 +128,6 @@ export class DashboardService {
       };
     });
 
-    const notifications = await this.notificationService.findAll(userId, { page: 1, limit: 5 });
-    const recentNotifications = Array.isArray(notifications) ? notifications : [];
-
     return {
       role,
       stats: {
@@ -150,7 +144,6 @@ export class DashboardService {
       todaySchedule,
       upcomingSchedule,
       monthly,
-      recentNotifications,
     };
   }
 }

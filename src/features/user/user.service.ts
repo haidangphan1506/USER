@@ -17,9 +17,7 @@ import type {
   User,
 } from '@packages/entities/user';
 import { checkUuidValid, compareData, hashData } from '@packages/helpers';
-import { MulterFile, UploadResponse } from '../uploads/upload.interface';
 import { ERROR_MESSAGES } from 'src/data/constants';
-import { UploadService } from '../uploads/upload.service';
 
 function generateUserCode(): string {
   return randomBytes(3).toString('hex').slice(0, 6).toUpperCase();
@@ -30,10 +28,7 @@ export class UserService {
   private readonly logger = new Logger(UserService.name);
   private readonly searchableFields = ['id', 'email', 'username', 'phone', 'userCode'] as const;
 
-  constructor(
-    private readonly userRepo: UserRepository,
-    private readonly upload: UploadService,
-  ) {}
+  constructor(private readonly userRepo: UserRepository) {}
 
   // TODO: generate unique username from first/last name
   async generateUsername(firstName: string, lastName: string): Promise<string> {
@@ -270,21 +265,5 @@ export class UserService {
 
     await this.updateUserPasswordService({ id: userId, password: dto.newPassword });
     return { message: 'Password changed successfully' };
-  }
-
-  // TODO: upload and set user avatar
-  async uploadAvatarService(userId: string, file: MulterFile) {
-    if (!userId || (userId && !checkUuidValid({ data: userId })))
-      throw new BadRequestException(ERROR_MESSAGES.USER_ID_MUST_BE_UUID);
-
-    const user = await this.userRepo.findById(userId);
-    if (!user) throw new BadRequestException(ERROR_MESSAGES.USER_NOT_FOUND);
-
-    const result: UploadResponse = await this.upload.upload(file, 'avatars');
-
-    if (!result?.url) throw new BadRequestException('');
-    const userUpdated = await this.userRepo.update(userId, { avatar: result.url });
-    if (!userUpdated) throw new BadRequestException(ERROR_MESSAGES.UPDATE_USER_AVATAR_FAILED);
-    return userUpdated;
   }
 }

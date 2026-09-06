@@ -16,7 +16,6 @@ import { DRIZZLE } from '../../database/database.module';
 import { type PostgresJsDatabase } from 'drizzle-orm/postgres-js';
 import { eq } from 'drizzle-orm';
 import { users } from '../../database/schema';
-import { RedisService } from '../redis/redis.service';
 import { MessageService } from './message.service';
 import { ConversationService } from './conversation.service';
 
@@ -43,7 +42,6 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
     @Inject(DRIZZLE) private readonly db: PostgresJsDatabase<Record<string, never>>,
-    private readonly redisService: RedisService,
     private readonly messageService: MessageService,
     private readonly conversationService: ConversationService,
   ) {}
@@ -85,8 +83,6 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
       this.onlineUsers.set(userId, client.id);
 
-      await this.redisService.set(`user:${userId}:status`, 'online', 3600);
-
       this.server.emit('user:status', { userId, status: 'online' });
 
       console.log(`[WS] User connected: ${userId} (${client.id})`);
@@ -96,10 +92,9 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     }
   }
 
-  async handleDisconnect(client: AuthenticatedSocket) {
+  handleDisconnect(client: AuthenticatedSocket) {
     if (client.userId) {
       this.onlineUsers.delete(client.userId);
-      await this.redisService.set(`user:${client.userId}:status`, 'offline', 3600);
       this.server.emit('user:status', { userId: client.userId, status: 'offline' });
       console.log(`[WS] User disconnected: ${client.userId} (${client.id})`);
     }

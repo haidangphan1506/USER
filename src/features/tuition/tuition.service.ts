@@ -12,7 +12,6 @@ import type {
 } from '@packages/entities/tuition';
 import { TuitionRepository } from './tuition.repository';
 import { checkUuidValid } from '@packages/helpers';
-import { NotificationService } from '../notification/notification.service';
 
 @Injectable()
 export class TuitionService {
@@ -21,7 +20,6 @@ export class TuitionService {
     private readonly repo: TuitionRepository,
     @Inject(DRIZZLE)
     private readonly db: ReturnType<typeof drizzle>,
-    private readonly notificationService: NotificationService,
   ) {}
 
   async create(dto: CreateTuitionDto, tutorId: string) {
@@ -34,16 +32,6 @@ export class TuitionService {
       throw new NotFoundException(ERROR_MESSAGES.CLASS_NOT_FOUND);
     }
     const result = await this.repo.create(dto);
-    void this.notificationService.createInternal({
-      type: 'TUITION',
-      senderId: tutorId,
-      userId: dto.studentId,
-      classId: dto.classId,
-      title: 'Học phí mới',
-      content: `Bạn có học phí mới cần thanh toán. Số tiền: ${Number(dto.amount).toLocaleString('vi-VN')} VND`,
-      actionType: 'PAYMENT',
-      actionLabel: 'Xem chi tiết',
-    });
     return result;
   }
 
@@ -71,18 +59,6 @@ export class TuitionService {
       throw new NotFoundException(ERROR_MESSAGES.CLASS_NOT_FOUND);
     }
     const updated = await this.repo.update(id, dto);
-    if (dto.status === 'PAID' && updated) {
-      void this.notificationService.createInternal({
-        type: 'TUITION',
-        senderId: tutorId,
-        userId: tuition.studentId,
-        classId: tuition.classId,
-        title: 'Xác nhận thanh toán học phí',
-        content: 'Học phí của bạn đã được xác nhận thanh toán thành công.',
-        actionType: 'PAYMENT',
-        actionLabel: 'Xem chi tiết',
-      });
-    }
     return updated;
   }
 

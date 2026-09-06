@@ -18,7 +18,6 @@ import { ExerciseRepository } from './exercise.repository';
 import { UserService } from '../user/user.service';
 import { SessionService } from '../session/session.service';
 import { LessonService } from '../lesson/lesson.service';
-import { NotificationService } from '../notification/notification.service';
 
 @Injectable()
 export class ExerciseService {
@@ -28,7 +27,6 @@ export class ExerciseService {
     private readonly userService: UserService,
     private readonly sessionService: SessionService,
     private readonly lessonService: LessonService,
-    private readonly notificationService: NotificationService,
   ) {}
 
   private assertUuid(value: string | null | undefined, label: string) {
@@ -90,17 +88,6 @@ export class ExerciseService {
     }
 
     const created = await this.repo.create({ data: { ...data, status: 'SUBMITTED' } });
-    // notify the tutor that a student has submitted work
-    void this.notificationService.createInternal({
-      type: 'STUDENT',
-      senderId: userId,
-      userId: data.tutorId,
-      studentId: data.studentId,
-      title: 'Học sinh nộp bài tập',
-      content: 'Một học sinh vừa nộp bài tập. Vào chấm bài ngay.',
-      actionType: 'VIEW',
-      actionLabel: 'Xem bài nộp',
-    });
     return created;
   }
 
@@ -147,17 +134,6 @@ export class ExerciseService {
       id,
       data: { exerciseUrls: data.exerciseUrls, status: 'SUBMITTED' },
     });
-    // notify the tutor that the student re-submitted their work
-    void this.notificationService.createInternal({
-      type: 'STUDENT',
-      senderId: userId,
-      userId: found.tutorId,
-      studentId: found.studentId,
-      title: 'Học sinh nộp lại bài tập',
-      content: 'Một học sinh vừa nộp lại bài tập. Vào chấm bài ngay.',
-      actionType: 'VIEW',
-      actionLabel: 'Xem bài nộp',
-    });
     return updated;
   }
 
@@ -188,20 +164,6 @@ export class ExerciseService {
         status: 'GRADED',
         gradedAt: new Date(),
       },
-    });
-    // notify the student that their exercise has been graded
-    void this.notificationService.createInternal({
-      type: 'TUTOR',
-      senderId: userId,
-      userId: found.studentId,
-      studentId: found.studentId,
-      title: 'Bài tập đã được chấm',
-      content: `Bài tập của bạn đã được chấm điểm: ${data.score}/10${
-        data.comment ? ` — ${data.comment}` : ''
-      }`,
-      actionType: 'VIEW',
-      actionLabel: 'Xem kết quả',
-      redirectUrl: '/grades',
     });
     return graded;
   }
