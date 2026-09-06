@@ -12,14 +12,22 @@ export class RabbitMQProducer {
   async publish(routingKey: string, payload: unknown, options?: Options.Publish) {
     const content = Buffer.from(JSON.stringify(payload));
 
-    await this.rabbitMQService
-      .getChannel()
-      .publish(this.rabbitMQService.exchange, routingKey, content, {
-        persistent: true,
-        contentType: 'application/json',
-        ...options,
-      });
+    try {
+      await this.rabbitMQService
+        .getChannel()
+        .publish(this.rabbitMQService.exchange, routingKey, content, {
+          persistent: true,
+          contentType: 'application/json',
+          ...options,
+        });
 
-    this.logger.debug(`Published message routingKey=${routingKey}`);
+      this.logger.log(`[Publish OK] routingKey=${routingKey}`);
+    } catch (error) {
+      this.logger.error(
+        `[Publish FAILED] routingKey=${routingKey} - ${(error as Error).message}`,
+        (error as Error).stack,
+      );
+      throw error;
+    }
   }
 }

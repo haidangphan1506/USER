@@ -13,7 +13,7 @@ import { ConfirmChannel } from 'amqplib';
 @Injectable()
 export class RabbitMQService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(RabbitMQService.name);
-  private connection: amqp.AmqpConnectionManager;
+  private connection!: amqp.AmqpConnectionManager;
   private channelWrapper: ChannelWrapper;
   readonly exchange: string;
 

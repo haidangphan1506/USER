@@ -33,8 +33,12 @@ export class RabbitMQConsumer {
             const payload = JSON.parse(msg.content.toString()) as T;
             await handler(payload, msg);
             channel.ack(msg);
+            this.logger.log(`[Consume OK] queue=${queue} routingKey=${routingKey}`);
           } catch (error) {
-            this.logger.error(`Failed to process message queue=${queue}`, (error as Error).stack);
+            this.logger.error(
+              `[Consume FAILED] queue=${queue} routingKey=${routingKey} - ${(error as Error).message}`,
+              (error as Error).stack,
+            );
             channel.nack(msg, false, false);
           }
         })();
