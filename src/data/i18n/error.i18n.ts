@@ -27,6 +27,10 @@ export const ERROR_TRANSLATIONS = {
   },
   USER_NO_LONGER_EXISTS: { vi: 'Người dùng không còn tồn tại', en: 'User no longer exists' },
   FAILED_TO_CREATE_USER: { vi: 'Tạo người dùng thất bại', en: 'Failed to create user' },
+  FEATURE_NOT_AVAILABLE: {
+    vi: 'Tính năng này hiện không khả dụng',
+    en: 'This feature is currently unavailable',
+  },
 
   // Auth validation (Zod schema messages)
   AUTH_EMAIL_REQUIRED: { vi: 'Vui lòng nhập email', en: 'Email is required' },

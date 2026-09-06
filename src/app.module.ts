@@ -4,8 +4,6 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { AuthModule } from './features/auth/auth.module';
 import { DatabaseModule } from './database/database.module';
-import { EmailModule } from './features/email/email.module';
-import { RedisModule } from './features/redis/redis.module';
 // import { RabbitMQModule } from './features/rabbitmq/rabbitmq.module';
 import { UserModule } from './features/user/user.module';
 import { AdminModule } from './features/admin/admin.module';
@@ -15,19 +13,18 @@ import { CurriculumModule } from './features/curriculum/curriculum.module';
 import { ChapterModule } from './features/chapter/chapter.module';
 import { LessonModule } from './features/lesson/lesson.module';
 import { TuitionModule } from './features/tuition/tuition.module';
-import { NotificationModule } from './features/notification/notification.module';
 import { ScheduleModule } from './features/schedule/schedule.module';
 import { SessionModule } from './features/session/session.module';
-import { JwtAuthGuard, LanguageGuard, TokenBucketGuard } from '@packages/guards';
+import { JwtAuthGuard, LanguageGuard } from '@packages/guards';
 import { APP_GUARD } from '@nestjs/core';
 import { JwtModule } from '@nestjs/jwt';
-import { UploadModule } from './features/uploads/upload.module';
 import { ExerciseModule } from './features/exercise/exercise.module';
 import { AttendanceModule } from './features/attendance/attendance.module';
 import { DashboardModule } from './features/dashboard/dashboard.module';
 import { ReportModule } from './features/report/report.module';
 import { ChatModule } from './features/chat/chat.module';
 import { AgentsModule } from './features/agents/agents.module';
+import { RabbitMQModule } from './features/rabbitmq/rabbitmq.module';
 
 @Module({
   imports: [
@@ -35,9 +32,7 @@ import { AgentsModule } from './features/agents/agents.module';
       isGlobal: true,
     }),
     DatabaseModule,
-    EmailModule,
-    RedisModule,
-    // RabbitMQModule,
+    RabbitMQModule,
     UserModule,
     AdminModule,
     AuthModule,
@@ -47,10 +42,8 @@ import { AgentsModule } from './features/agents/agents.module';
     CurriculumModule,
     ChapterModule,
     TuitionModule,
-    NotificationModule,
     ScheduleModule,
     SessionModule,
-    UploadModule,
     ExerciseModule,
     AttendanceModule,
     DashboardModule,
@@ -72,10 +65,6 @@ import { AgentsModule } from './features/agents/agents.module';
     {
       provide: APP_GUARD,
       useClass: LanguageGuard,
-    },
-    {
-      provide: APP_GUARD,
-      useClass: TokenBucketGuard,
     },
   ],
 })
