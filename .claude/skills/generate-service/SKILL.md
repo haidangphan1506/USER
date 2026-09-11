@@ -87,7 +87,7 @@ items })` (one multi-row insert — do NOT loop single inserts).
 - Validate every UUID param with `checkUuidValid({ data: id })` before hitting the DB.
 - `BadRequestException` for bad input, `NotFoundException` when a row is missing / not owned,
   `ConflictException` for unresolvable uniqueness collisions.
-- Inject sibling feature services (`UserService`, `NotificationService`, …) rather than
+- Inject sibling feature services (`UserService`, `LessonService`, …) rather than
   re-querying their tables directly; import their modules in `foo.module.ts`.
 - Keep Drizzle table access in the repository; the injected `db` is only for cross-table
   transactions when needed.

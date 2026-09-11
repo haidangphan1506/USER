@@ -6,7 +6,7 @@ description: Scaffold a complete NestJS feature module (entity schema/dto, contr
 # Generate NestJS Feature
 
 Scaffold a full feature module for this backend (an education / tutoring platform — classes,
-students, schedules, sessions, curriculums, exercises, assignments, tuition, notifications)
+students, schedules, sessions, curriculums, exercises, assignments, tuition)
 that matches the existing **`class`** feature exactly. Use the `class` feature
 (`src/features/class/*`, `src/packages/entities/class/*`) as the reference when in doubt.
 
@@ -17,7 +17,7 @@ Ask the user (or infer from the request) before generating:
 1. **Feature name** — singular, lowercase (e.g. `session`). Controller route is the plural (`sessions`).
 2. **Fields** — name, type, required/optional, validation (min/max/uuid/enum/url/regex).
 3. Whether it needs a **Drizzle table** in `src/database/schema.ts` (usually yes for a new domain).
-4. Which **sibling services** it depends on (`UserService`, `NotificationService`, …) so their
+4. Which **sibling services** it depends on (`UserService`, `LessonService`, …) so their
    modules get imported.
 
 If fields are unclear, propose a sensible set and confirm before writing files.

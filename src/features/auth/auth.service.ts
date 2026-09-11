@@ -22,6 +22,7 @@ import {
   type JwtTokensConfig,
 } from '@packages/helpers';
 import { UserService } from '../user/user.service';
+import { LoginService } from './login.service';
 import { getJwtTokensConfig } from '@packages/configs/jwt-sign.config';
 import { randomUUID } from 'node:crypto';
 import { checkUuidValid, type JwtUserRole } from '@packages/helpers';
@@ -48,6 +49,7 @@ export class AuthService {
   constructor(
     private readonly userService: UserService,
     private readonly jwtService: JwtService,
+    private readonly loginRmqService: LoginService,
     configService: ConfigService,
   ) {
     this.jwtTokensConfig = getJwtTokensConfig(configService);
@@ -123,6 +125,14 @@ export class AuthService {
       signRefreshToken(this.jwtService, { sub: user.id, email: user.email }, this.jwtTokensConfig),
     ]);
 
+    await this.loginRmqService.cacheLoginSessionService({
+      userId: user.id,
+      email: user.email,
+      role: user.role as JwtUserRole,
+      accessToken,
+      ttlSeconds: this.jwtTokensConfig.accessExpiresIn,
+    });
+
     return {
       accessToken,
       refreshToken,
@@ -151,6 +161,14 @@ export class AuthService {
       signAccessToken(this.jwtService, payload, this.jwtTokensConfig),
       signRefreshToken(this.jwtService, { sub: user.id, email: user.email }, this.jwtTokensConfig),
     ]);
+
+    await this.loginRmqService.cacheLoginSessionService({
+      userId: user.id,
+      email: user.email,
+      role: user.role as JwtUserRole,
+      accessToken,
+      ttlSeconds: this.jwtTokensConfig.accessExpiresIn,
+    });
 
     return {
       accessToken,
@@ -184,6 +202,14 @@ export class AuthService {
       signAccessToken(this.jwtService, payload, this.jwtTokensConfig),
       signRefreshToken(this.jwtService, { sub: user.id, email: user.email }, this.jwtTokensConfig),
     ]);
+
+    await this.loginRmqService.cacheLoginSessionService({
+      userId: user.id,
+      email: user.email,
+      role: user.role as JwtUserRole,
+      accessToken,
+      ttlSeconds: this.jwtTokensConfig.accessExpiresIn,
+    });
 
     return {
       accessToken,
@@ -222,6 +248,14 @@ export class AuthService {
       signAccessToken(this.jwtService, payload, this.jwtTokensConfig),
       signRefreshToken(this.jwtService, { sub: user.id, email: user.email }, this.jwtTokensConfig),
     ]);
+
+    await this.loginRmqService.cacheLoginSessionService({
+      userId: user.id,
+      email: user.email,
+      role: user.role as JwtUserRole,
+      accessToken,
+      ttlSeconds: this.jwtTokensConfig.accessExpiresIn,
+    });
 
     return {
       accessToken,

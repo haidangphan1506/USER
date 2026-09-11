@@ -22,3 +22,14 @@
 - **Swagger**: body/query schemas in `src/data/swaggers/data/{name}.swagger.ts`, response
   messages in `src/data/swaggers/messages/{name}.msg.ts`. Use `@ApiResponse()` decorator from
   `@packages/decorators` for success messages.
+- **Request logging**: the global `LoggerInterceptor` (`@packages/interceptor`, wired in
+  `main.ts`) logs `[Request]`/`[Response]`/`[Error]`/`[Timing]` lines including the request body
+  and response data, redacting any key in its `SENSITIVE_KEYS` list (`password`, `token`,
+  `accessToken`, `refreshToken`, etc.) and truncating logged JSON at 1000 chars. If a new field
+  name carrying a secret is introduced (e.g. a new `*Secret`/`*Key` DTO field), add it to
+  `SENSITIVE_KEYS` rather than relying on truncation to hide it.
+- **RabbitMQ pass/fail logging**: `RabbitMQProducer.publish` and `RabbitMQConsumer.subscribe`
+  (`src/features/rabbitmq/*`) log an explicit `[Publish OK/FAILED]` / `[Consume OK/FAILED]` line
+  per message (with routing key/queue and, on failure, the error + stack) — this is built into
+  the shared producer/consumer classes, so any feature that publishes or subscribes gets pass/fail
+  visibility for free; don't add ad-hoc logging around individual `publish`/`subscribe` call sites.

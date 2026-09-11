@@ -17,7 +17,6 @@ export class LanguageGuard implements CanActivate {
   canActivate(context: ExecutionContext): boolean {
     const request = context.switchToHttp().getRequest<RequestWithLanguage>();
     request.language = this.resolveLanguage(request.headers['accept-language']);
-    this.logger.log('language', request.language);
     return true;
   }
 
@@ -39,7 +38,6 @@ export class LanguageGuard implements CanActivate {
     const match = ranked.find((item) =>
       (SUPPORTED_LANGUAGES as readonly string[]).includes(item.primary),
     );
-    this.logger.log(match);
     return (match?.primary as SupportedLanguage) ?? DEFAULT_LANGUAGE;
   }
 }

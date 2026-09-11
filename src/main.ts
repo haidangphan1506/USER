@@ -1,3 +1,4 @@
+import { Logger } from '@nestjs/common';
 import { NestFactory, Reflector } from '@nestjs/core';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { AppModule } from './app.module';
@@ -57,6 +58,8 @@ async function bootstrap() {
     },
   });
 
-  await app.listen(process.env.PORT ?? 8888);
+  const port = process.env.PORT ?? 8888;
+  await app.listen(port);
+  Logger.log(`Backends listening on port ${port}`, 'Bootstrap');
 }
 void bootstrap();

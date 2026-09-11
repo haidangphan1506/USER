@@ -19,7 +19,7 @@ import { FooService } from './foo.service';
 import { UserModule } from '../user/user.module';
 
 @Module({
-  imports: [UserModule], // + any feature module whose service Foo injects (e.g. NotificationModule)
+  imports: [UserModule], // + any feature module whose service Foo injects
   controllers: [FooController],
   providers: [FooService, FooRepository],
   exports: [FooService], // export if another feature will inject FooService
@@ -39,5 +39,5 @@ Run `bun run build` (or `bunx tsc --noEmit`) to confirm the module resolves and 
 
 ## Not for infra modules
 This scaffold is for domain feature modules. A module wrapping an external connection
-(redis, rabbitmq) is `@Global()`, has no repository/controller, and exports its service(s)
+(rabbitmq) is `@Global()`, has no repository/controller, and exports its service(s)
 directly — see the "Infra modules" note in `.claude/rules/nestjs-feature-pattern.md`.
