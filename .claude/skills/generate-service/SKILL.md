@@ -5,7 +5,9 @@ description: Scaffold the service layer (src/features/{name}/{name}.service.ts) 
 
 # Generate Service
 
-Create `src/features/foo/foo.service.ts`, mirroring `class.service.ts`.
+Create `src/features/foo/foo.service.ts`. The `class` feature this skill originally mirrored
+was removed in a 2026-09-12 trim — follow the shape below; `user.service.ts` is the closest
+surviving example of the `...Service` suffix + validate-then-delegate convention.
 
 ## Prerequisites
 - `FooRepository` exists (see `generate-repository`).
@@ -40,7 +42,7 @@ export class FooService {
 }
 ```
 
-## Methods (mirror class.service.ts — note the `...Service` suffix)
+## Methods (note the `...Service` suffix)
 - `createFooService({ userId, data })` — validate `userId` is a UUID (`checkUuidValid`),
   confirm the user exists via `this.user.getUserByField({ field: 'id', value: userId })`,
   duplicate-check unique fields via `this.repo.getFooByField({ field, value })`, validate any
@@ -53,32 +55,34 @@ export class FooService {
   ownership (`row.tutorId !== userId` → `NotFoundException`), then `this.repo.delFoo({ id })`.
 - If the domain needs a unique human code, add `generateNewCodeService()` — loop
   `generateCode()` (from `@packages/helpers`) with a MAX_RETRIES cap, `ConflictException` on
-  exhaustion (see `class.service.ts`).
+  exhaustion (see `StudentService.generateUniqueCode`).
 
-## Child resources owned through a parent (see `schedule.service.ts`)
-When the feature is a child of `class` (e.g. `schedule`, `session`) and has no `tutorId` of its
-own, authorize **through the parent class** instead of re-checking the user table:
-- Inject the parent's service (`private readonly classService: ClassService`) and import
-  `ClassModule` in the feature module.
+## Child resources owned through a parent
+(No surviving example after the 2026-09-12 trim removed the old `class`/`schedule`/`session`
+child-resource features — apply this pattern from scratch when a new feature needs it.)
+When the feature is a child of some parent resource `bar` and has no `tutorId` of its own,
+authorize **through the parent** instead of re-checking the user table:
+- Inject the parent's service (`private readonly barService: BarService`) and import
+  `BarModule` in the feature module.
 - Add a private guard that loads the parent and enforces ownership, reused by every method:
   ```ts
-  private async assertClassOwner({ userId, classId }: { userId: string; classId: string }) {
-    if (!classId || !checkUuidValid({ data: classId }))
-      throw new BadRequestException('Class Id must be uuid ...');
-    const classData = await this.classService.getClassService({ userId, id: classId });
-    if (!classData || (Array.isArray(classData) && classData.length === 0))
-      throw new NotFoundException('Class not found ...');
-    if (classData.tutorId !== userId) throw new NotFoundException('Class not found ...');
-    return classData;
+  private async assertBarOwner({ userId, barId }: { userId: string; barId: string }) {
+    if (!barId || !checkUuidValid({ data: barId }))
+      throw new BadRequestException('Bar Id must be uuid ...');
+    const barData = await this.barService.getBarService({ userId, id: barId });
+    if (!barData || (Array.isArray(barData) && barData.length === 0))
+      throw new NotFoundException('Bar not found ...');
+    if (barData.tutorId !== userId) throw new NotFoundException('Bar not found ...');
+    return barData;
   }
   ```
 - For get/update/delete by the child's own id, first load the child row, then call
-  `assertClassOwner({ userId, classId: row.classId })` (see `loadOwnedSchedule`). Return
-  `NotFoundException` (not `Forbidden`) on an ownership miss so records aren't enumerable.
+  `assertBarOwner({ userId, barId: row.barId })`. Return `NotFoundException` (not `Forbidden`)
+  on an ownership miss so records aren't enumerable.
 - List by parent instead of a global paginated list: `get{Children}ByParentService({ userId,
   parentId })` → guard, then `repo.getByParent({ parentId })`.
 
-## Bulk create (see `createSchedulesService`)
+## Bulk create
 For a `{ parentId, items: [...] }` bulk schema, add `create{Children}Service({ userId, data })`
 that runs the parent-owner guard once, then delegates to a single `repo.createMany({ parentId,
 items })` (one multi-row insert — do NOT loop single inserts).
@@ -87,7 +91,7 @@ items })` (one multi-row insert — do NOT loop single inserts).
 - Validate every UUID param with `checkUuidValid({ data: id })` before hitting the DB.
 - `BadRequestException` for bad input, `NotFoundException` when a row is missing / not owned,
   `ConflictException` for unresolvable uniqueness collisions.
-- Inject sibling feature services (`UserService`, `LessonService`, …) rather than
+- Inject sibling feature services (`UserService`, `AdminService`, …) rather than
   re-querying their tables directly; import their modules in `foo.module.ts`.
 - Keep Drizzle table access in the repository; the injected `db` is only for cross-table
   transactions when needed.

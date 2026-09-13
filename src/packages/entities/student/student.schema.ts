@@ -29,8 +29,6 @@ export const updateStudentSchema = z.object({
   address: z.string().max(500).optional(),
   district: z.string().max(30).optional(),
   province: z.string().max(30).optional(),
-  // Replaces (not adds to) the student's current class enrollment — '' explicitly un-enrolls.
-  classId: z.union([z.literal(''), z.string().uuid()]).optional(),
   parentName: z.string().min(1).max(255).optional(),
   parentPhone: z.string().max(20).optional(),
   parentEmail: z.string().email('Invalid parent email').optional(),
@@ -45,7 +43,6 @@ export const getStudentsQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(100).default(10),
   search: z.string().trim().min(1).optional(),
-  classId: z.string().uuid().optional().default(''),
   tutorId: z.string().uuid('Invalid tutor ID').optional(),
   gender: z.enum(['MALE', 'FEMALE', 'OTHER']).optional(),
   // `z.coerce.boolean()` treats the string "false" as truthy — use an explicit enum instead so

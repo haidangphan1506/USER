@@ -5,10 +5,13 @@ description: Scaffold a complete NestJS feature module (entity schema/dto, contr
 
 # Generate NestJS Feature
 
-Scaffold a full feature module for this backend (an education / tutoring platform — classes,
-students, schedules, sessions, curriculums, exercises, assignments, tuition)
-that matches the existing **`class`** feature exactly. Use the `class` feature
-(`src/features/class/*`, `src/packages/entities/class/*`) as the reference when in doubt.
+Scaffold a full feature module for this backend (an education / tutoring platform). As of a
+2026-09-12 trim, the live feature set is just `auth`, `user`, `admin`, `student` (+ the
+`rabbitmq` infra module) — the old `class`/`schedule`/`session`/`curriculum`/etc. features and
+their schema tables were removed. There is no single feature that matches this skill's shape
+exactly anymore, so **the "Shape to match" section below is the authoritative template** —
+use `src/features/student/*` only as a secondary, partial example of the controller → service →
+repository → module layering (it predates and doesn't fully follow every convention below).
 
 ## Inputs
 
@@ -17,7 +20,7 @@ Ask the user (or infer from the request) before generating:
 1. **Feature name** — singular, lowercase (e.g. `session`). Controller route is the plural (`sessions`).
 2. **Fields** — name, type, required/optional, validation (min/max/uuid/enum/url/regex).
 3. Whether it needs a **Drizzle table** in `src/database/schema.ts` (usually yes for a new domain).
-4. Which **sibling services** it depends on (`UserService`, `LessonService`, …) so their
+4. Which **sibling services** it depends on (`UserService`, `AdminService`, …) so their
    modules get imported.
 
 If fields are unclear, propose a sensible set and confirm before writing files.
@@ -48,7 +51,7 @@ For a feature named `foo`:
 - Swagger: `src/data/swaggers/data/foo.swagger.ts` (`FOO_SWAGGERS_DATA`) +
   `src/data/swaggers/messages/foo.msg.ts` (`FOO_SWAGGER_MESSAGES`)
 
-## Shape to match (from the `class` feature)
+## Shape to match
 
 - **Entity** — `createFooSchema`, `updateFooSchema = createFooSchema.partial()`,
   `getFoosQuerySchema` using plain `z.coerce` pagination (NOT `z.preprocess`). Reused enums
@@ -68,7 +71,7 @@ For a feature named `foo`:
 
 1. **`src/database/schema.ts`** — if a new table is needed, add the `pgEnum`(s) and
    `pgTable('foos', {...})` with a UUID primary key (`.defaultRandom()`), `createdAt` /
-   `updatedAt` timestamps, following the style of `classes` / `users`. Then run
+   `updatedAt` timestamps, following the style of `users` / `grades`. Then run
    `bun run db:generate` and tell the user to run `bun run db:migrate`.
 2. **`src/app.module.ts`** — add `import { FooModule } from './features/foo/foo.module';`
    and insert `FooModule` into the `imports: [...]` array (near the other feature modules).

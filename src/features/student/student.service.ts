@@ -1,10 +1,10 @@
 import { ConflictException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { ERROR_MESSAGES } from 'src/data/constants';
 import { Inject } from '@nestjs/common';
-import { and, eq } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/postgres-js';
 import { DRIZZLE } from '../../database/database.module';
-import { classes, classStudents, studentScores, sessions, users } from '../../database/schema';
+import { users } from '../../database/schema';
 import type {
   CreateStudentDto,
   GetStudentsQueryDto,
@@ -152,14 +152,6 @@ export class StudentService {
   async findAll(query: GetStudentsQueryDto) {
     const { students, pagination } = await this.repo.getAllStudents({ query });
 
-    const classRows = await this.repo.getClassesForStudentIds(students.map((s) => s.id));
-    const classesByStudentId = new Map<string, { id: string; name: string; code: string }[]>();
-    for (const row of classRows) {
-      const list = classesByStudentId.get(row.studentId) ?? [];
-      list.push({ id: row.id, name: row.name, code: row.code });
-      classesByStudentId.set(row.studentId, list);
-    }
-
     return {
       students: students.map((s) => ({
         id: s.id,
@@ -171,8 +163,7 @@ export class StudentService {
         phone: s.phone,
         avatar: s.avatar,
         gender: s.gender,
-        dateOfBirth:
-          s.dateOfBirth instanceof Date ? s.dateOfBirth.toISOString() : s.dateOfBirth,
+        dateOfBirth: s.dateOfBirth instanceof Date ? s.dateOfBirth.toISOString() : s.dateOfBirth,
         school: s.school,
         address: s.address,
         district: s.district,
@@ -199,8 +190,6 @@ export class StudentService {
           : null,
         role: s.role,
         isActive: s.isActive,
-        classes: classesByStudentId.get(s.id) ?? [],
-        classCount: (classesByStudentId.get(s.id) ?? []).length,
         createdAt: s.createdAt instanceof Date ? s.createdAt.toISOString() : String(s.createdAt),
         updatedAt: s.updatedAt instanceof Date ? s.updatedAt.toISOString() : String(s.updatedAt),
       })),
@@ -211,32 +200,6 @@ export class StudentService {
   async findById(id: string) {
     const user = await this.repo.findById({ id });
     if (!user) throw new NotFoundException(ERROR_MESSAGES.STUDENT_NOT_FOUND);
-
-    const [scoreRow] = await this.db
-      .select({ score: studentScores.score })
-      .from(studentScores)
-      .where(eq(studentScores.studentId, id))
-      .limit(1);
-
-    const enrolledClasses = await this.db
-      .select({
-        id: classes.id,
-        name: classes.name,
-        code: classes.code,
-        subject: classes.subject,
-        status: classes.status,
-      })
-      .from(classStudents)
-      .innerJoin(classes, eq(classes.id, classStudents.classId))
-      .where(eq(classStudents.studentId, id));
-
-    const sessionRows = enrolledClasses[0]?.id
-      ? await this.db
-          .select()
-          .from(sessions)
-          .where(eq(sessions.classId, enrolledClasses[0].id))
-          .limit(10)
-      : [];
 
     const parent = user.parent;
 
@@ -278,10 +241,6 @@ export class StudentService {
         : null,
       role: user.role,
       isActive: user.isActive,
-      classCount: enrolledClasses.length,
-      score: scoreRow?.score ? String(scoreRow.score) : null,
-      classes: enrolledClasses,
-      recentSessions: sessionRows,
       createdAt:
         user.createdAt instanceof Date ? user.createdAt.toISOString() : String(user.createdAt),
       updatedAt:
@@ -376,33 +335,6 @@ export class StudentService {
         // Link the newly created parent to the student — do NOT pass the parent's own
         // record here, `repo.update` writes onto the student's row (`id`).
         updated = (await this.repo.update({ id, data: { parentId: parent.id } })) ?? student;
-      }
-    }
-
-    // ── class enrollment ──
-    // `classId` replaces (not adds to) the student's current enrollment — a student is shown
-    // with a single "current class" in the UI, so switching classes must drop the old link.
-    // Empty string explicitly un-enrolls.
-    if (dto.classId !== undefined) {
-      if (dto.classId === '') {
-        await this.db.delete(classStudents).where(eq(classStudents.studentId, id));
-      } else {
-        // A student with no tutorId can't own/match any class — bail out before querying
-        // instead of coercing to '', which Postgres rejects as an invalid uuid.
-        if (!student.tutorId) throw new NotFoundException(ERROR_MESSAGES.CLASS_NOT_FOUND);
-
-        const [matchedClass] = await this.db
-          .select({ id: classes.id })
-          .from(classes)
-          .where(and(eq(classes.id, dto.classId), eq(classes.tutorId, student.tutorId)))
-          .limit(1);
-        if (!matchedClass) throw new NotFoundException(ERROR_MESSAGES.CLASS_NOT_FOUND);
-
-        await this.db.delete(classStudents).where(eq(classStudents.studentId, id));
-        await this.db
-          .insert(classStudents)
-          .values({ classId: matchedClass.id, studentId: id })
-          .onConflictDoNothing();
       }
     }
 

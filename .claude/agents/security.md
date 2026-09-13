@@ -36,9 +36,11 @@ services, repositories, guards, and schema changes.
 
 ## What to check
 - **AuthZ / IDOR**: every endpoint reads `@CurrentUser()` and the service enforces ownership
-  (e.g. `row.tutorId !== userId`) before returning/mutating. A user must not read or delete
-  another user's classes/sessions/etc. by guessing a UUID. Verify new routes aren't
-  accidentally `@Public()` and admin actions use `@Admin()`.
+  (e.g. `row.tutorId !== userId`, `row.parentId !== userId`) before returning/mutating. A user
+  must not read or update/delete another user's profile, student, or managed-user record by
+  guessing a UUID. Verify new routes aren't accidentally `@Public()` and admin actions use
+  `@Roles('ADMIN')` (from `@packages/decorators`) + `RolesGuard` — there is no `@Admin()`
+  decorator.
 - **AuthN**: JWT verification not bypassed; access vs. refresh secrets not confused; token
   TTLs sane; no tokens/passwords logged.
 - **Injection**: Drizzle used parameterized (no raw string SQL concatenation); dynamic column

@@ -1,11 +1,11 @@
 import { Inject, Injectable } from '@nestjs/common';
 import type { GetStudentsQueryDto } from '@packages/entities/student';
 import { buildListWhereClause } from '@packages/helpers';
-import { and, count, desc, eq, inArray } from 'drizzle-orm';
+import { and, count, desc, eq } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 import { drizzle } from 'drizzle-orm/postgres-js';
 import { DRIZZLE } from 'src/database/database.module';
-import { classes, classStudents, users } from 'src/database/schema';
+import { users } from 'src/database/schema';
 
 @Injectable()
 export class StudentRepository {
@@ -97,10 +97,10 @@ export class StudentRepository {
 
   // todo : get and filter student ...
   async getAllStudents({ query }: { query: GetStudentsQueryDto }) {
-    const { page, limit, search, classId, tutorId, gender, isActive } = query;
+    const { page, limit, search, tutorId, gender, isActive } = query;
     const offset = (page - 1) * limit;
 
-    const searchWhere = buildListWhereClause({
+    const where = buildListWhereClause({
       search,
       searchableColumns: {
         userCode: { column: users.userCode },
@@ -115,19 +115,6 @@ export class StudentRepository {
         isActive: { column: users.isActive },
       },
     });
-
-    const where = classId
-      ? and(
-          searchWhere,
-          inArray(
-            users.id,
-            this.db
-              .select({ id: classStudents.studentId })
-              .from(classStudents)
-              .where(eq(classStudents.classId, classId)),
-          ),
-        )
-      : searchWhere;
 
     const [totalRow] = await this.db.select({ total: count() }).from(users).where(where);
     const total = Number(totalRow?.total ?? 0);
@@ -183,23 +170,6 @@ export class StudentRepository {
       students,
       pagination: { total, page, limit, totalPages: Math.ceil(total / limit) },
     };
-  }
-
-  /** Batch-fetch the enrolled class(es) for a page of students — used by the list endpoint so it
-   *  shows real class name/code instead of a bare enrollment count. */
-  async getClassesForStudentIds(studentIds: string[]) {
-    if (studentIds.length === 0) return [];
-
-    return this.db
-      .select({
-        studentId: classStudents.studentId,
-        id: classes.id,
-        name: classes.name,
-        code: classes.code,
-      })
-      .from(classStudents)
-      .innerJoin(classes, eq(classes.id, classStudents.classId))
-      .where(inArray(classStudents.studentId, studentIds));
   }
 
   // todo: get detail user by data field (userCode, id , username, name,...)

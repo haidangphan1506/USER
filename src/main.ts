@@ -1,5 +1,6 @@
 import { Logger } from '@nestjs/common';
 import { NestFactory, Reflector } from '@nestjs/core';
+import { MicroserviceOptions, Transport } from '@nestjs/microservices';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { AppModule } from './app.module';
 import { ResponseInterceptor } from '@packages/interceptor/response.interceptor';
@@ -7,12 +8,25 @@ import { ErrorInterceptor, LoggerInterceptor } from '@packages/interceptor';
 import { HttpExceptionFilter } from '@packages/filters';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create(AppModule, { logger: ['error', 'warn', 'log', 'debug', 'verbose'] });
 
   app.enableCors({ origin: true, credentials: true });
   app.useGlobalInterceptors(new ResponseInterceptor(app.get(Reflector)));
   app.useGlobalInterceptors(new ErrorInterceptor(), new LoggerInterceptor());
   app.useGlobalFilters(new HttpExceptionFilter());
+
+  const rabbitMqUrl = process.env.RABBITMQ_URL;
+  if (!rabbitMqUrl) {
+    throw new Error('RABBITMQ_URL not found — required to start the user-service RMQ listener');
+  }
+  app.connectMicroservice<MicroserviceOptions>({
+    transport: Transport.RMQ,
+    options: {
+      urls: [rabbitMqUrl],
+      queue: process.env.USER_QUEUE ?? 'user_queue',
+      queueOptions: { durable: true },
+    },
+  });
 
   const config = new DocumentBuilder()
     .setTitle('Backends API')
@@ -58,8 +72,11 @@ async function bootstrap() {
     },
   });
 
+  await app.startAllMicroservices();
+  Logger.log(`[USER] RMQ listener bound to queue "user_queue"`, 'Bootstrap');
+
   const port = process.env.PORT ?? 8888;
   await app.listen(port);
-  Logger.log(`Backends listening on port ${port}`, 'Bootstrap');
+  Logger.log(`[USER] listening on port ${port}`, 'Bootstrap');
 }
 void bootstrap();

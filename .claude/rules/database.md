@@ -13,4 +13,11 @@
   `let scopeWhere: SQL | undefined;` (import `type SQL` from `drizzle-orm`). An untyped `let`
   defaults to implicit `any`, which then makes any `conditions` array holding it `any[]` and
   trips `@typescript-eslint/no-unsafe-argument` the moment it's spread into `and(...conditions)`.
-  See `ClassRepository.getClasses` for the reference shape.
+  See `UserRepository.buildUserListConditions` or `AdminRepository`'s list method for the
+  reference shape.
+- **2026-09-12 schema trim**: `schema.ts` was cut down to just `users` + `grades` — the
+  education-scheduling tables (`classes`, `class_students`, `schedules`, `class_sessions`,
+  `curriculums`, `chapters`, `lessons`, `tuitions`, `notifications`, `student_scores`,
+  `ai_messages`, `attendances`, `exercises`, `conversations`, `conversation_participants`,
+  `messages`) and their enums were dropped via a generated migration. See
+  `[[trimmed-feature-set]]` memory for why and what to do if these come back.

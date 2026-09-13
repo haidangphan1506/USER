@@ -1,10 +1,19 @@
-# CLAUDE.md — Backends
+# CLAUDE.md — user
 
 ## Project Overview
 
-Backend API server for the **My Finance Tracker** application (quản lý thu chi cá nhân).
-Built with **NestJS 11** + **TypeScript**, using **PostgreSQL** (Drizzle ORM) and **Redis**.
-Frontend repository: `d:\my-finance-tracker`.
+**Identity/admin** microservice of a tutoring-platform backend split into 4 independent NestJS
+services: `gateway` (HTTP-facing), `user` (this repo — auth/user/admin/student), `tutor-service`
+(education domain), `third-service` (notification/email/upload). Built with **NestJS 11** +
+**TypeScript**, **PostgreSQL** (Drizzle ORM). This is the only service `gateway` actually calls
+today — its `auth`/`user`/`admin`/`student` RPC handlers are live and working end-to-end.
+
+This repo previously described a personal-finance app ("My Finance Tracker" —
+categories/wallets/transactions), then briefly an education-scheduling monolith
+(`class`/`schedule`/`session`/etc.); both are gone. **2026-09-12 trim** cut it down to just
+`auth`/`user`/`admin`/`student` + the schema down to `users`/`grades` (see
+`.claude/rules/database.md` and `[[trimmed-feature-set]]` memory). The `.claude/rules/*.md`
+files were kept in sync with this; this `CLAUDE.md` was not, until now.
 
 ## IMPORTANT: Selective File Reading
 
@@ -16,6 +25,9 @@ Frontend repository: `d:\my-finance-tracker`.
 3. Read related entities: `src/packages/entities/{name}/*`
 4. Read database schema only if modifying tables: `src/database/schema.ts`
 5. Read `app.module.ts` only when registering new modules
+6. If the feature is reached from `gateway`, read the matching `*.rpc.controller.ts` here to
+   see the actual `@MessagePattern` contract, and cross-check against `gateway`'s
+   `sendRpc(...)` call site (sibling repo, `../gateway/`) when changing either side.
 
 ### When fixing a bug:
 1. Read the specific file with the bug
@@ -24,11 +36,12 @@ Frontend repository: `d:\my-finance-tracker`.
 
 ### When adding a new feature:
 1. Use `generate-*` skills first (they encode the patterns)
-2. Read only the reference feature mentioned in the skill
+2. Read only the reference feature mentioned in `.claude/rules/nestjs-feature-pattern.md`
+   (there is no single canonical feature since the 2026-09-12 trim — see that rule)
 3. Read `src/app.module.ts` to register the new module
 
 ### Files to read ONLY when necessary:
-- `src/main.ts` — Only when changing bootstrap configuration
+- `src/main.ts` — Only when changing bootstrap or the RMQ listener setup
 - `src/app.module.ts` — Only when adding/removing modules
 - `src/database/schema.ts` — Only when modifying database schema
 - `src/packages/helpers/*` — Only when using specific helpers
@@ -36,27 +49,26 @@ Frontend repository: `d:\my-finance-tracker`.
 
 ## Tech Stack
 
-| Layer            | Technology                                  |
-| ---------------- | ------------------------------------------- |
-| Framework        | NestJS 11                                   |
-| Language         | TypeScript 5 (strictNullChecks only)        |
-| Database         | PostgreSQL 16 via Drizzle ORM + postgres.js |
-| Cache / Queue    | Redis 7 (ioredis)                           |
-| Authentication   | Passport JWT (access + refresh tokens)      |
-| Validation       | Zod v4 (via custom `ZodValidationPipe`)     |
-| Email            | Nodemailer                                  |
-| API Docs         | @nestjs/swagger                             |
-| Package Manager  | Bun (runtime) / npm (lock file present)     |
-| Testing          | Jest (unit) + Supertest (e2e)               |
-| Formatting       | Prettier (single quotes, trailing commas)   |
-| Linting          | ESLint + typescript-eslint                  |
-| Containerization | Docker Compose / Podman Compose             |
+| Layer            | Technology                                              |
+| ---------------- | --------------------------------------------------------- |
+| Framework        | NestJS 11                                                |
+| Language         | TypeScript 5 (strictNullChecks only)                     |
+| Database         | PostgreSQL via Drizzle ORM — only `users` + `grades` tables live |
+| Inter-service    | RabbitMQ RPC (`@nestjs/microservices`, RMQ transport) — the only service with live `@MessagePattern` responders (`auth`/`user`/`admin`/`student`), reached by `gateway`'s `USER_SERVICE` client on `user_queue`. Also runs the `rabbitmq` pub/sub feature like the other 3. |
+| Authentication   | Passport JWT (access + refresh) — token issuance lives here; `gateway` verifies locally and calls back here to confirm the user exists |
+| Validation       | Zod v4 (via custom `ZodValidationPipe`)                  |
+| API Docs         | @nestjs/swagger (note: title/description in `main.ts` still say "financial management system" — stale, harmless) |
+| Package Manager  | Bun (runtime) / npm (lock file present)                  |
+| Testing          | Jest (unit + e2e) + Supertest — **not** a separate Bun-native runner |
+| Formatting       | Prettier (single quotes, trailing commas)                |
+| Linting          | ESLint + typescript-eslint                               |
+| Containerization | Docker Compose / Podman Compose (Postgres + Redis — Redis/email/Cloudinary/AWS packages are installed but **not currently used**: password-reset and logout-blacklist code paths that would need Redis/email were removed, see `auth.service.ts` comments) |
 
 ## Commands
 
 ```bash
 # Development
-bun start:dev             # Start dev server with watch (port 8888)
+bun start:dev             # Start dev server with watch
 bun start:debug           # Start with debug + watch
 bun run build             # Production build
 bun run start:prod        # Run compiled JS
@@ -64,7 +76,7 @@ bun run start:prod        # Run compiled JS
 # Code Quality
 bun run lint              # ESLint with --fix
 bun run lint:check        # ESLint without fix (CI-friendly)
-bun run format            # Prettier write
+bun run format             # Prettier write
 bun run format:check      # Prettier check
 
 # Testing
@@ -80,200 +92,83 @@ bun run db:migrate        # Run pending migrations
 bun run db:push           # Push schema directly (dev only)
 bun run db:studio         # Open Drizzle Studio
 
-# Database Seeds
-bun run db:seed:user      # Seed a single user
-bun run db:seed:users-bulk # Bulk seed users
+# Database Seeds (scripts/*.ts, Bun runtime)
+bun run db:seed:user / users-bulk / grades
+# seed-categories.ts / seed-wallet.ts / seed-edu-flow.ts / seed-dashboard.ts /
+# seed-curriculum-demo.ts scripts still exist on disk but target tables that no longer exist
+# in schema.ts (post-trim) — do not run them; they're leftover from the pre-trim schema.
 
-# Containers
-bun compose:up            # Docker Compose up -d (Postgres + Redis)
-bun compose:down          # Docker Compose down
-bun podman:up             # Podman Compose up -d
-bun podman:down           # Podman Compose down
-bun podman:logs           # Podman Compose logs -f postgres
+# Containers (Postgres + Redis)
+bun compose:up / compose:down
+bun podman:up / podman:down / podman:logs
 ```
 
 ## Project Structure
 
 ```
 src/
-├── main.ts                       # Bootstrap: CORS, interceptors, filters, listen
+├── main.ts                       # Bootstrap: CORS, interceptors, filters, RMQ listener (user_queue), listen
 ├── app.module.ts                 # Root module (imports all feature modules)
-├── app.controller.ts             # Health-check controller
-├── app.service.ts                # Health-check service
+├── app.controller.ts / app.service.ts   # Health-check
 ├── database/
-│   ├── database.module.ts        # Global Drizzle ORM provider (postgres.js)
-│   └── schema.ts                 # All table definitions (users, categories, wallets, transactions)
-├── features/                     # Feature modules (NestJS pattern)
-│   ├── auth/                     # Authentication (login, register, refresh, forgot/reset password)
-│   │   ├── auth.controller.ts
-│   │   ├── auth.service.ts
-│   │   └── auth.module.ts
-│   ├── user/                     # User CRUD
-│   ├── category/                 # Category CRUD (with repository)
-│   ├── wallet/                   # Wallet management (with repository)
-│   ├── transaction/              # Transaction management (with repository)
-│   ├── email/                    # Email service (Nodemailer + MailerModule)
-│   └── redis/                    # Redis service wrapper
-└── packages/                     # Shared utilities (import via @packages/*)
-    ├── configs/                  # JWT sign config
-    ├── decorators/               # @ApiResponse, @Public, @User decorators
-    ├── entities/                 # DTOs + Zod schemas per domain
-    │   ├── auth/                 # auth.dto.ts + auth.schema.ts
-    │   ├── user/
-    │   ├── category/
-    │   ├── wallet/
-    │   └── transactions/
-    ├── filters/                  # HttpExceptionFilter (global)
-    ├── guards/                   # JwtAuthGuard (global), AdminRoleGuard
-    ├── helpers/                  # hashing, JWT, query list helpers
-    ├── interceptor/              # ResponseInterceptor, ErrorInterceptor, LoggerInterceptor
-    ├── interfaces/               # ApiResponseInterface, UserInterface
-    ├── pipes/                    # ZodValidationPipe
-    └── strategy/                 # JwtUserStrategy (Passport)
-
-drizzle/                          # Auto-generated SQL migrations
-scripts/                          # Seed scripts (Bun runtime)
-test/
-├── jest-e2e.json                 # E2E test config
-└── app.e2e-spec.ts               # E2E tests
+│   ├── database.module.ts        # Global Drizzle ORM provider
+│   └── schema.ts                 # Live tables: users, grades (everything else trimmed 2026-09-12)
+├── features/
+│   ├── auth/          # HTTP controller + auth.rpc.controller.ts (@MessagePattern responder) + service
+│   ├── user/           # HTTP controller + user.rpc.controller.ts + service + repository
+│   ├── admin/          # Generic managed-user CRUD (/admin/students, /admin/tutors) + admin.rpc.controller.ts
+│   ├── student/        # Student-specific surface (parent linking + profile) + student.rpc.controller.ts
+│   └── rabbitmq/        # Pub/sub infra (separate from the RPC responders above)
+└── packages/            # Shared utilities (import via @packages/*): configs, decorators, entities,
+                          # filters, guards, helpers, interceptor, interfaces, pipes, strategy
 ```
 
 ## Code Conventions
 
-### Path Alias
+See `.claude/rules/conventions.md` and `.claude/rules/nestjs-feature-pattern.md` — both already
+accurately describe the post-trim `auth`/`user`/`admin`/`student` domain in detail (the
+admin/student split, self-update field restrictions, etc.). Summary: `@packages/*` alias, Zod v4
+via `ZodValidationPipe`, JWT auth with `@Public()`/`@Roles('ADMIN')`,
+`ERROR_MESSAGES`/`SUCCESS_MESSAGES` constants, Prettier single-quote/100-width enforced by a
+PostToolUse hook.
 
-- `@packages/*` → `src/packages/*` (configured in `tsconfig.json` and Jest `moduleNameMapper`)
-- Example: `import { Public } from '@packages/decorators'`
+### Request/Response Flow (HTTP path)
 
-### Feature Module Pattern
-
-Each feature follows the NestJS module pattern:
-
-```
-features/{name}/
-├── {name}.module.ts     # Module definition (imports, providers, controllers)
-├── {name}.controller.ts # Route handlers (uses @Body with ZodValidationPipe)
-├── {name}.service.ts    # Business logic
-└── {name}.repository.ts # Database queries (optional, used by category/wallet/transaction)
-```
-
-### Entity / DTO Pattern
-
-Entities live in `src/packages/entities/{domain}/`:
-
-- `{domain}.schema.ts` — Zod validation schemas (used in controllers via `ZodValidationPipe`)
-- `{domain}.dto.ts` — TypeScript interfaces/types derived from schemas
-- `index.ts` — Re-exports everything
-
-### Request/Response Flow
-
-1. Request → Global `JwtAuthGuard` (unless `@Public()` decorator)
-2. Controller validates body via `ZodValidationPipe` (Zod schema)
+1. Request → Global `JwtAuthGuard` (unless `@Public()`)
+2. Controller validates body via `ZodValidationPipe`
 3. Service → Repository → Drizzle ORM → PostgreSQL
-4. `ResponseInterceptor` wraps response:
-   ```json
-   {
-     "statusCode": 200,
-     "message": "Success",
-     "data": { ... },
-     "timestamp": "2024-01-01T00:00:00.000Z",
-     "method": "POST",
-     "path": "/api/auth/login"
-   }
-   ```
-5. Errors handled by `ErrorInterceptor` + `HttpExceptionFilter`
+4. `ResponseInterceptor` wraps the response the same way for both the HTTP controller and the
+   RPC controller's underlying service call.
+5. Errors handled by `ErrorInterceptor` + `HttpExceptionFilter` (HTTP) or `RpcExceptionFilter`
+   (RPC, translated back into an `HttpException` by `gateway`'s `sendRpc`).
 
-### Authentication
+### RPC contract (see also `../.claude/rules/architecture.md`)
 
-- **Global guard**: `JwtAuthGuard` applied via `APP_GUARD` in `AppModule`
-- **Public routes**: Use `@Public()` decorator to skip JWT verification
-- **Admin routes**: Use `@Admin()` guard for role-based access
-- **Token flow**: Access token (3h default) + Refresh token (7d default)
-- **Refresh**: POST `/auth/refresh` with `{ refreshToken }` → new pair
-- **401 handling**: Automatic token refresh on frontend via Axios interceptors
-
-### Validation
-
-- All request bodies validated with **Zod v4** schemas via custom `ZodValidationPipe`
-- Schemas defined in `src/packages/entities/{domain}/{domain}.schema.ts`
-- DTOs are TypeScript types inferred from schemas
-
-### Database
-
-- **ORM**: Drizzle ORM with `postgres.js` driver
-- **Schema**: Single file `src/database/schema.ts` (all tables)
-- **Migrations**: Generated to `drizzle/` directory via `drizzle-kit generate`
-- **Global provider**: `DRIZZLE` injection token available in all modules
-- **Tables**: users, categories, wallets, transactions (UUID primary keys)
-- **Enums**: user_role, category_type, wallet_type, transaction_type, transaction_status
-
-### Code Style
-
-- **Prettier**: Single quotes, trailing commas (all), 100 print width, semicolons
-- **ESLint**: With typescript-eslint and prettier plugin
-- **Import style**: `import { X } from '@packages/...'` using path alias
-- **Decorator order**: `@Controller` → `@Public` → `@HttpCode` → `@ApiResponse` → method
+Each feature's `*.rpc.controller.ts` is a thin `@MessagePattern('<feature>.<methodName>')`
+mirror of its HTTP controller, delegating to the *same* `*Service` class — no duplicated logic.
+When adding or renaming a pattern here, update `gateway`'s matching `sendRpc(...)` call site in
+the same change (use the `add-rpc-endpoint` skill in `../.claude/skills/`) — nothing enforces
+the pattern string across repos, so a mismatch is a silent 404.
 
 ## Environment Variables
 
-| Variable                      | Description                    | Default                              |
-| ----------------------------- | ------------------------------ | ------------------------------------ |
-| `NODE_ENV`                    | Environment mode               | `development`                        |
-| `PORT`                        | Server port                    | `8888`                               |
-| `POSTGRES_HOST`               | PostgreSQL host                | `localhost`                          |
-| `POSTGRES_PORT`               | PostgreSQL port                | `5433`                               |
-| `POSTGRES_DB`                 | Database name                  | `backends_db`                        |
-| `POSTGRES_USER`               | Database user                  | `postgres`                           |
-| `POSTGRES_PASSWORD`           | Database password              | `postgres`                           |
-| `DATABASE_URL`                | Full PostgreSQL connection URL | Built from POSTGRES\_\* vars         |
-| `JWT_ACCESS_SECRET`           | Access token secret (UUID v4)  | Required                             |
-| `JWT_REFRESH_SECRET`          | Refresh token secret (UUID v4) | Required                             |
-| `JWT_ACCESS_EXPIRES_SECONDS`  | Access token TTL               | `10800` (3h)                         |
-| `JWT_REFRESH_EXPIRES_SECONDS` | Refresh token TTL              | `604800` (7d)                        |
-| `REDIS_HOST`                  | Redis host                     | `localhost`                          |
-| `REDIS_PORT`                  | Redis port                     | `6380`                               |
-| `REDIS_PASSWORD`              | Redis password                 | Optional                             |
-| `REDIS_URL`                   | Full Redis connection URL      | Optional (overrides REDIS_HOST/PORT) |
-| `MAIL_HOST`                   | SMTP host                      | `smtp.gmail.com`                     |
-| `MAIL_PORT`                   | SMTP port                      | `587`                                |
-| `MAIL_SECURE`                 | SMTP TLS                       | `true`                               |
-| `MAIL_USER`                   | SMTP username                  | Required in production               |
-| `MAIL_PASS`                   | SMTP password                  | Required in production               |
-| `MAIL_FROM`                   | Sender email address           | Required in production               |
-| `PASSWORD_RESET_URL_BASE`     | Frontend reset password URL    | `http://localhost:3000`              |
-| `RABBITMQ_URL`                | RabbitMQ connection URL        | Required                             |
-| `RABBITMQ_EXCHANGE`           | Topic exchange name            | `app.events`                         |
+| Variable                      | Description                    |
+| ----------------------------- | ------------------------------- |
+| `NODE_ENV`                    | Environment mode                |
+| `PORT`                        | Server port (default `8888` — must be unique when running alongside the other 3 services) |
+| `DATABASE_URL`                | Postgres connection URL         |
+| `JWT_ACCESS_SECRET` / `JWT_REFRESH_SECRET` | Must match `gateway`'s secrets (token issuance happens here) |
+| `JWT_ACCESS_EXPIRES_SECONDS` / `JWT_REFRESH_EXPIRES_SECONDS` | Token TTLs |
+| `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` / `GOOGLE_CALLBACK_URL` / `GOOGLE_OAUTH_REDIRECT_URL` | Google OAuth (final token issuance lands here via RPC from `gateway`) |
+| `RABBITMQ_URL`                | RabbitMQ connection URL         |
+| `RABBITMQ_EXCHANGE`           | Topic exchange for pub/sub (default `app.events`) |
+| `USER_QUEUE`                  | RMQ RPC listener queue name (default `user_queue`) — this is the queue `gateway`'s `USER_SERVICE` client actually talks to |
 
-## Docker Services
-
-The `docker-compose.yml` provides:
-
-- **PostgreSQL 16 Alpine** — maps to host port `5433` (avoids conflict with local `5432`)
-- **Redis 7 Alpine** — maps to host port `6380` (avoids conflict with local `6379`)
-
-Data persisted in `postgres_data` named volume.
-
-## Git Remote
-
-```
-origin: https://gitlab.com/finance_tracker_phandanghai/backends.git
-```
-
-## Key Files to Know
-
-- `src/main.ts` — Bootstrap with CORS, interceptors, filters
-- `src/app.module.ts` — Root module with all imports + global JWT guard
-- `src/database/schema.ts` — All Drizzle table definitions
-- `src/database/database.module.ts` — Global DB provider
-- `src/packages/interceptor/response.interceptor.ts` — Standard response wrapper
-- `src/packages/pipes/zod-validation.pipe.ts` — Zod validation pipe
-- `src/packages/guards/jwt-auth.guard.ts` — Global JWT auth guard
-- `src/packages/decorators/public.decorator.ts` — `@Public()` decorator
-- `src/packages/entities/` — All DTOs and validation schemas
+No `REDIS_*`, `AWS_*`, `CLOUDINARY_*`, `MAIL_*`, or `RESEND_*` vars are read anywhere in `src/`
+despite the matching packages being installed — password-reset/email and logout-blacklist paths
+that would need them were removed (see `auth.service.ts` comments). Don't add them speculatively.
 
 ## Project Rules
-
-The following rule files are loaded as part of these instructions and must be followed:
 
 @.claude/rules/nestjs-feature-pattern.md
 @.claude/rules/database.md
@@ -288,7 +183,5 @@ Configured in `.claude/settings.json` (scripts in `.claude/hooks/`):
 - **PostToolUse (Write|Edit)** → `format-ts.mjs` runs prettier + eslint `--fix` on the
   touched `.ts/.js` file.
 - **Stop** → `review-skills.mjs` runs after each task that changed `src/`, and asks Claude to
-  review/update `.claude/rules/**`, `.claude/skills/**`, and memory (`MEMORY.md` + memory
-  files) so they stay in sync with new or changed patterns/facts. Fires once per distinct
-  `src/` change state (loop-safe: the review turn edits only skill/rule/memory files, not
-  `src/`); the last-reviewed state is cached in `.claude/.cache/skill-review-state` (gitignored).
+  review/update `.claude/rules/**`, `.claude/skills/**`, `.claude/agents/**`, and memory
+  (`MEMORY.md` + memory files) so they stay in sync with new or changed patterns/facts.

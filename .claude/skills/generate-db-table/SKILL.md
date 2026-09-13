@@ -6,7 +6,8 @@ description: Add a Drizzle table (and any pgEnum) to src/database/schema.ts for 
 # Generate Drizzle Table
 
 Add a `pgTable` (and needed `pgEnum`s) to `src/database/schema.ts`, following the style of
-the existing `users` / `classes` tables.
+the existing `users` / `grades` tables (the schema was trimmed down to just these two on
+2026-09-12 — see `[[trimmed-feature-set]]` memory).
 
 ## Inputs
 - Table name (plural, snake_case), e.g. `invoices`.

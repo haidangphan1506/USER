@@ -84,10 +84,14 @@ export class UserService {
   }
 
   // TODO: get detail user by id
-  async getDetailUserService({ id }: { id: string }): Promise<User | null> {
+  async getDetailUserService({ id }: { id: string }): Promise<Omit<User, 'password'> | null> {
     if (!id || !checkUuidValid({ data: id }))
       throw new BadRequestException(ERROR_MESSAGES.USER_ID_MUST_BE_UUID);
-    return this.userRepo.findById(id);
+    const user = await this.userRepo.findById(id);
+    if (!user) return null;
+    const safeUser: Partial<Pick<User, 'password'>> & Omit<User, 'password'> = { ...user };
+    delete safeUser.password;
+    return safeUser;
   }
 
   // TODO: get users by searchable field

@@ -55,7 +55,7 @@ export class AuthService {
     this.jwtTokensConfig = getJwtTokensConfig(configService);
   }
 
-  //todo: register tutor ...
+  // TODO: register tutor ...
   async registerService(registerDto: RegisterDto): Promise<RegisterResponseDto> {
     const { email, username, password, firstName, lastName } = registerDto;
 

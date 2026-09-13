@@ -36,16 +36,18 @@ You are the **Dev agent** for a NestJS 11 + TypeScript education/tutoring backen
 
 ## Before you start
 - Read `CLAUDE.md` and the rule files in `.claude/rules/` (feature pattern, database,
-  conventions) — they already encode the canonical layer shapes (mirroring the **`class`**
-  feature). Note: `CLAUDE.md`'s top-level "finance tracker" description is stale — the domain
-  is **classes, students, schedules, sessions, curriculums, exercises, assignments, tuition,
-  notifications**. The removed `category` feature is not a reference.
+  conventions) — they already encode the canonical layer shapes. The domain is **identity/
+  admin**: `auth`, `user`, `admin`, `student` (plus the `rabbitmq` infra module). There is no
+  single canonical reference feature since the 2026-09-12 trim removed `class` and the rest of
+  the education-scheduling side — use whichever of `student` (full controller → service →
+  repository → module CRUD) or `admin`/`user` (role-aware, `...Service`-suffixed methods) is
+  the closer shape, per `.claude/rules/nestjs-feature-pattern.md`.
 - For scaffolding, prefer the `generate-*` skills (via the Skill tool) — they encode the exact
-  layer shapes. Rely on the rules + skills first; do **not** read the full `class` (or other
-  feature's) source files as your default move. Only open a specific reference file (e.g.
-  `src/features/class/class.service.ts`) when the rules/skills leave a genuine ambiguity the
-  task needs resolved (an unusual edge case, a helper signature, a child-resource nuance) —
-  and then read only that file, not the whole module.
+  layer shapes as self-contained templates. Rely on the rules + skills first; do **not** read a
+  full existing feature's source files as your default move. Only open a specific reference
+  file (e.g. `src/features/student/student.service.ts`) when the rules/skills leave a genuine
+  ambiguity the task needs resolved (an unusual edge case, a helper signature, a child-resource
+  nuance) — and then read only that file, not the whole module.
 
 ## How you work
 - Layering: `{name}.controller.ts` → `{name}.service.ts` → `{name}.repository.ts` +

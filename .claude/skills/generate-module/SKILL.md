@@ -10,7 +10,8 @@ Create `src/features/foo/foo.module.ts` and register it in `app.module.ts`.
 ## Prerequisites
 Controller, service, and (optionally) repository exist for the feature.
 
-## `foo.module.ts` (mirror class.module.ts)
+## `foo.module.ts` (the `class` feature this originally mirrored was removed in a 2026-09-12
+trim — `student.module.ts` / `admin.module.ts` are the closest surviving examples)
 ```ts
 import { Module } from '@nestjs/common';
 import { FooController } from './foo.controller';

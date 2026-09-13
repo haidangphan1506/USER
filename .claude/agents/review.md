@@ -43,8 +43,10 @@ for branch scope. Focus on what changed and code it directly affects.
 - No leaked secrets, no unhandled promise, no N+1 that should be a join/`inArray`.
 
 ## Conventions (from .claude/rules/)
-- Feature layering matches the `class` reference: controller delegates only, repo holds all
-  Drizzle, service holds validation. Methods suffixed `...Service`.
+- Feature layering: controller delegates only, repo holds all Drizzle, service holds
+  validation. Methods suffixed `...Service`. No single canonical reference feature since the
+  2026-09-12 trim — check against `student` or `admin`/`user`, per
+  `.claude/rules/nestjs-feature-pattern.md`.
 - List methods return `{ <resource>, pagination }` (not `data`); query schema uses `z.coerce`
   pagination; `@CurrentUser()` (not `@User`); `@packages/*` imports; Swagger via
   `src/data/swaggers/*` files. New modules registered in `app.module.ts`.

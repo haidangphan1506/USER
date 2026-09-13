@@ -5,8 +5,12 @@ description: Scaffold the entities layer for a domain — Zod v4 schema (create 
 
 # Generate Entity (Zod schema + DTO)
 
-Create `src/packages/entities/{domain}/` for a domain named `foo`, mirroring
-`src/packages/entities/class/`.
+Create `src/packages/entities/{domain}/` for a domain named `foo`. The `class` entities this
+skill originally mirrored were removed in a 2026-09-12 trim — use the shape below as the
+template; `src/packages/entities/student/` and `src/packages/entities/admin/` are the closest
+surviving examples, though neither strictly does `updateFooSchema = createFooSchema.partial()`
+(they define update schemas by hand / via `.extend()`), so follow the shape below over those
+two where they diverge.
 
 ## Inputs
 - Domain name (singular, lowercase), e.g. `session`.
@@ -17,14 +21,13 @@ Create `src/packages/entities/{domain}/` for a domain named `foo`, mirroring
 ### `foo.schema.ts`
 Zod v4. Export:
 - Shared enums first, e.g. `export const fooStatusEnum = z.enum(['OPEN', 'CLOSED']);`
-- `createFooSchema = z.object({ ... })` — one rule per field, friendly messages matching
-  the existing `class.schema.ts` style (e.g. `z.string({ message: 'Name is required' })`).
+- `createFooSchema = z.object({ ... })` — one rule per field, friendly messages matching the
+  existing `student.schema.ts` style (e.g. `z.string({ message: 'Name is required' })`).
   Coerce numbers/dates with `z.coerce.number()` / `z.coerce.date()`; UUID FKs with
   `.uuid('Invalid tutor ID')`.
-- `updateFooSchema = createFooSchema.partial()` (`.omit({ ... })` any immutable field, as
-  `class.schema.ts` omits `tutorId`).
+- `updateFooSchema = createFooSchema.partial()` (`.omit({ ... })` any immutable field).
 - `getFoosQuerySchema = z.object({ ... })` — plain `z.coerce` pagination, copy the shape from
-  `class.schema.ts`:
+  `student.schema.ts` / `user.schema.ts`:
   ```ts
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(100).default(10),
@@ -43,7 +46,7 @@ export type UpdateFooDto = Partial<z.infer<typeof createFooSchema>>;
 export type GetFoosQueryDto = z.infer<typeof getFoosQuerySchema>;
 ```
 Add a hand-written `FooDetailDto` type only if the detail endpoint returns computed fields
-(see `ClassDetailDto` with `studentCount` / `sessionCount`).
+not present on the base row (e.g. counts or joined summary data).
 
 ### `index.ts`
 ```ts
@@ -53,6 +56,7 @@ export * from './foo.dto';
 
 ## Rules
 - Single quotes, trailing commas, 100-char width.
-- Export reused enums as `z.enum([...])` (see `classStatusEnum`, `sessionFormatEnum`). The DB
-  enum lives separately in `schema.ts` as `pgEnum` — keep the value lists in sync.
+- Export reused enums as `z.enum([...])` (see `userRoleEnum` / `genderEnum` mirrored from
+  `schema.ts`). The DB enum lives separately in `schema.ts` as `pgEnum` — keep the value lists
+  in sync.
 - Consumed by controllers via `new ZodValidationPipe<Dto>(schema)` — keep export names stable.

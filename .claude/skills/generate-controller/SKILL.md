@@ -5,7 +5,10 @@ description: Scaffold the controller layer (src/features/{name}/{name}.controlle
 
 # Generate Controller
 
-Create `src/features/foo/foo.controller.ts`, mirroring `class.controller.ts`.
+Create `src/features/foo/foo.controller.ts`, following the shape below (the `class` feature
+this skill originally mirrored was removed in a 2026-09-12 trim; `student.controller.ts` is the
+closest surviving example, though it inlines Swagger schemas instead of using the data-file
+pattern and doesn't use the `...Service` suffix — follow the shape below, not that quirk).
 
 ## Prerequisites
 - `FooService` exists (see `generate-service`).
@@ -36,7 +39,7 @@ export class FooController {
 }
 ```
 
-## Routes (mirror class.controller.ts)
+## Routes
 - `@Post()` `@HttpCode(StatusCodes.CREATED)` → body via
   `new ZodValidationPipe<CreateFooDto>(createFooSchema)` + `@CurrentUser() user`; call
   `this.fooService.createFooService({ data: dto, userId: user.id })`.
@@ -50,10 +53,12 @@ export class FooController {
 Get the current user with `@CurrentUser() user: Record<string, string>` (from
 `@packages/decorators`) and read `user.id` — do NOT use the old `@User` decorator.
 
-For a **child resource** owned via a parent (e.g. `schedule`), the routes differ: add
-`@Post('bulk')` (bulk create), `@Get('class/:classId')` (list by parent) instead of a global
-paginated `@Get()`, and `@Patch(':id')` for partial update. Declare the specific
-`bulk` / `class/:classId` routes before `:id`. See `schedule.controller.ts`.
+For a **child resource** owned via a parent (e.g. a `foo` that belongs to some `bar`), the
+routes differ: add `@Post('bulk')` (bulk create), `@Get('bar/:barId')` (list by parent) instead
+of a global paginated `@Get()`, and `@Patch(':id')` for partial update. Declare the specific
+`bulk` / `bar/:barId` routes before `:id`. (No surviving example of this pattern in the
+codebase after the 2026-09-12 trim — the old `schedule`/`session` child-resource features were
+removed; apply the pattern described here from scratch.)
 
 ## Swagger (data-driven)
 Swagger content lives in dedicated files, not inline strings:

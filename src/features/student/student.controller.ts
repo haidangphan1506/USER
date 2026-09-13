@@ -103,7 +103,7 @@ export class StudentController {
   @SwaggerResponse({ status: 201, description: 'Student created' })
   create(
     @Body(new ZodValidationPipe(createStudentSchema))
-    dto: CreateStudentDto & { classId?: string },
+    dto: CreateStudentDto,
     @CurrentUser() currentUser: JwtGuardUser,
   ) {
     return this.studentService.create(dto, currentUser);
@@ -115,13 +115,6 @@ export class StudentController {
   @ApiQuery({ name: 'page', required: false, type: Number, example: 1 })
   @ApiQuery({ name: 'limit', required: false, type: Number, example: 10 })
   @ApiQuery({ name: 'search', required: false, type: String, description: 'Search by name/code' })
-  @ApiQuery({
-    name: 'classId',
-    required: false,
-    type: String,
-    format: 'uuid',
-    description: 'Filter by class',
-  })
   @ApiQuery({
     name: 'tutorId',
     required: false,
@@ -153,7 +146,7 @@ export class StudentController {
   @HttpCode(StatusCodes.OK)
   @ApiOperation({
     summary: 'Get student detail',
-    description: 'Get student detail with classes, scores, recent sessions',
+    description: 'Get student detail',
   })
   @ApiParam({ name: 'id', type: String, format: 'uuid' })
   @SwaggerResponse({
@@ -208,20 +201,6 @@ export class StudentController {
         },
         role: { type: 'string' },
         isActive: { type: 'boolean' },
-        classCount: { type: 'number' },
-        score: { type: 'string', nullable: true },
-        classes: {
-          type: 'array',
-          items: {
-            type: 'object',
-            properties: {
-              id: { type: 'string', format: 'uuid' },
-              name: { type: 'string' },
-              code: { type: 'string' },
-            },
-          },
-        },
-        recentSessions: { type: 'array', items: { type: 'object' } },
         createdAt: { type: 'string', format: 'date-time' },
         updatedAt: { type: 'string', format: 'date-time' },
       },
@@ -252,13 +231,6 @@ export class StudentController {
         address: { type: 'string', maxLength: 500, example: '123 Nguyen Trai' },
         district: { type: 'string', maxLength: 30, example: 'Thanh Xuan' },
         province: { type: 'string', maxLength: 30, example: 'Ha Noi' },
-        classId: {
-          type: 'string',
-          format: 'uuid',
-          example: '3fa85f64-5717-4562-b3fc-2c963f66afa6',
-          description:
-            "Replaces the student's current class enrollment (must belong to the same tutor). Pass an empty string to un-enroll.",
-        },
         parentName: { type: 'string', maxLength: 255, example: 'Tran Thi B' },
         parentPhone: { type: 'string', example: '0987654321' },
         parentEmail: { type: 'string', format: 'email', example: 'phuhuynh@gmail.com' },
