@@ -1,6 +1,5 @@
 import { Logger } from '@nestjs/common';
 import { NestFactory, Reflector } from '@nestjs/core';
-import { MicroserviceOptions, Transport } from '@nestjs/microservices';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { AppModule } from './app.module';
 import { ResponseInterceptor } from '@packages/interceptor/response.interceptor';
@@ -14,19 +13,6 @@ async function bootstrap() {
   app.useGlobalInterceptors(new ResponseInterceptor(app.get(Reflector)));
   app.useGlobalInterceptors(new ErrorInterceptor(), new LoggerInterceptor());
   app.useGlobalFilters(new HttpExceptionFilter());
-
-  const rabbitMqUrl = process.env.RABBITMQ_URL;
-  if (!rabbitMqUrl) {
-    throw new Error('RABBITMQ_URL not found — required to start the user-service RMQ listener');
-  }
-  app.connectMicroservice<MicroserviceOptions>({
-    transport: Transport.RMQ,
-    options: {
-      urls: [rabbitMqUrl],
-      queue: process.env.USER_QUEUE ?? 'user_queue',
-      queueOptions: { durable: true },
-    },
-  });
 
   const config = new DocumentBuilder()
     .setTitle('Backends API')
@@ -71,9 +57,6 @@ async function bootstrap() {
       persistAuthorization: true,
     },
   });
-
-  await app.startAllMicroservices();
-  Logger.log(`[USER] RMQ listener bound to queue "user_queue"`, 'Bootstrap');
 
   const port = process.env.PORT ?? 8888;
   await app.listen(port);

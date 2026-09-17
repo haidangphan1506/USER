@@ -3,9 +3,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
 import { UserModule } from '../user/user.module';
 import { AuthController } from './auth.controller';
-import { AuthRpcController } from './auth.rpc.controller';
 import { AuthService } from './auth.service';
-import { LoginService } from './login.service';
 import { getJwtModuleOptionsFromConfig } from '@packages/configs/jwt-sign.config';
 import { FacebookStrategy, GoogleStrategy } from '@packages/strategy';
 
@@ -18,8 +16,8 @@ import { FacebookStrategy, GoogleStrategy } from '@packages/strategy';
       useFactory: (configService: ConfigService) => getJwtModuleOptionsFromConfig(configService),
     }),
   ],
-  controllers: [AuthController, AuthRpcController],
-  providers: [AuthService, LoginService, GoogleStrategy, FacebookStrategy],
-  exports: [AuthService, LoginService],
+  controllers: [AuthController],
+  providers: [AuthService, GoogleStrategy, FacebookStrategy],
+  exports: [AuthService],
 })
 export class AuthModule {}
