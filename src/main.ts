@@ -5,9 +5,26 @@ import { AppModule } from './app.module';
 import { ResponseInterceptor } from '@packages/interceptor/response.interceptor';
 import { ErrorInterceptor, LoggerInterceptor } from '@packages/interceptor';
 import { HttpExceptionFilter } from '@packages/filters';
+import { MicroserviceOptions, Transport } from '@nestjs/microservices';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule, { logger: ['error', 'warn', 'log', 'debug', 'verbose'] });
+  const app = await NestFactory.create(AppModule, {
+    logger: ['error', 'warn', 'log', 'debug', 'verbose'],
+  });
+
+  app.connectMicroservice<MicroserviceOptions>({
+    transport: Transport.KAFKA,
+    options: {
+      client: {
+        clientId: process.env.KAFKA_CLIENT_ID ?? 'user-service',
+        brokers: (process.env.KAFKA_BROKERS ?? 'localhost:9092').split(','),
+      },
+      consumer: {
+        groupId: process.env.KAFKA_GROUP_ID ?? 'user-service',
+      },
+    },
+  });
+  await app.startAllMicroservices();
 
   app.enableCors({ origin: true, credentials: true });
   app.useGlobalInterceptors(new ResponseInterceptor(app.get(Reflector)));

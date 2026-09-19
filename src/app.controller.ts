@@ -1,12 +1,12 @@
 import { Controller, Get, Logger } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse as SwaggerResponse } from '@nestjs/swagger';
 import { AppService } from './app.service';
-import { EventPattern, Payload } from '@nestjs/microservices';
+import { EventPattern, MessagePattern, Payload } from '@nestjs/microservices';
 
 @ApiTags('Health')
 @Controller()
 export class AppController {
-  private readonly logger = new Logger(AppController.name)
+  private readonly logger = new Logger(AppController.name);
   constructor(private readonly appService: AppService) {}
 
   @Get()
@@ -21,14 +21,15 @@ export class AppController {
   }
 
   @EventPattern('kafka.ping')
-  async receivedRequestFromKafka(
-    @Payload() data: unknown,
-  ) {
-    this.logger.log(
-      'Received from kafka in gateway :',
-      data,
-    );
-  
-   return await data
-   }
+  receivedRequestFromKafka(@Payload() data: unknown): void {
+    this.logger.log(`[EMIT] kafka.ping <- gateway, payload=${JSON.stringify(data)}`);
+  }
+
+  @MessagePattern('kafka.echo')
+  echoRequestFromKafka(@Payload() data: string): { echo: string; receivedAt: string } {
+    this.logger.log(`[SEND] kafka.echo <- gateway, payload=${JSON.stringify(data)}`);
+    const result = { echo: data, receivedAt: new Date().toISOString() };
+    this.logger.log(`[SEND] kafka.echo -> gateway reply, result=${JSON.stringify(result)}`);
+    return result;
+  }
 }

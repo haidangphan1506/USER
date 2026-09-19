@@ -15,13 +15,13 @@ import { KafkaConsumer } from './kafka.consumer';
 
         options: {
           client: {
-            clientId: process.env.KAFKA_CLIENT_ID ?? 'gateway-service',
+            clientId: process.env.KAFKA_CLIENT_ID ?? 'user-service',
 
             brokers: (process.env.KAFKA_BROKERS ?? 'localhost:9092').split(','),
           },
 
           consumer: {
-            groupId: process.env.KAFKA_GROUP_ID ?? 'gateway-service',
+            groupId: process.env.KAFKA_GROUP_ID ?? 'user-service',
           },
         },
       },
