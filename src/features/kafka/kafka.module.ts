@@ -1,12 +1,35 @@
 import { Global, Module } from '@nestjs/common';
-
-import { KafkaConsumer } from './kafka.consumer';
+import { ClientsModule, Transport } from '@nestjs/microservices';
+import { KAFKA_PRODUCER } from './kafka.constants';
 import { KafkaProducer } from './kafka.producer';
-import { KafkaService } from './kafka.service';
+import { KafkaConsumer } from './kafka.consumer';
 
 @Global()
 @Module({
-  providers: [KafkaService, KafkaProducer, KafkaConsumer],
-  exports: [KafkaService, KafkaProducer, KafkaConsumer],
+  imports: [
+    ClientsModule.register([
+      {
+        name: KAFKA_PRODUCER,
+
+        transport: Transport.KAFKA,
+
+        options: {
+          client: {
+            clientId: process.env.KAFKA_CLIENT_ID ?? 'gateway-service',
+
+            brokers: (process.env.KAFKA_BROKERS ?? 'localhost:9092').split(','),
+          },
+
+          consumer: {
+            groupId: process.env.KAFKA_GROUP_ID ?? 'gateway-service',
+          },
+        },
+      },
+    ]),
+  ],
+
+  providers: [KafkaProducer, KafkaConsumer],
+
+  exports: [KafkaProducer, KafkaConsumer],
 })
 export class KafkaModule {}

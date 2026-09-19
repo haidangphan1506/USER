@@ -1,40 +1,26 @@
-import {
-  Injectable,
-  Logger,
-  OnModuleDestroy,
-  OnModuleInit,
-} from '@nestjs/common';
-import { Message, Producer } from 'kafkajs';
-
-import { KafkaService } from './kafka.service';
+import { Inject, Injectable, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import { KAFKA_PRODUCER, KAFKA_REQUEST_TOPICS } from './kafka.constants';
+import { ClientKafka } from '@nestjs/microservices';
+import { firstValueFrom } from 'rxjs';
 
 @Injectable()
 export class KafkaProducer implements OnModuleInit, OnModuleDestroy {
-  private readonly logger = new Logger(KafkaProducer.name);
-  private producer!: Producer;
-
-  constructor(private readonly kafkaService: KafkaService) {}
+  constructor(@Inject(KAFKA_PRODUCER) private readonly client: ClientKafka) {}
 
   async onModuleInit() {
-    this.producer = this.kafkaService.getClient().producer();
-    await this.producer.connect();
-    this.logger.log('Kafka producer connected');
+    KAFKA_REQUEST_TOPICS.forEach((topic) => this.client.subscribeToResponseOf(topic));
+    await this.client.connect();
   }
 
   async onModuleDestroy() {
-    await this.producer?.disconnect();
+    await this.client.close();
   }
 
-  async send(topic: string, messages: Message[]) {
-    try {
-      await this.producer.send({ topic, messages });
-      this.logger.log(`[Send OK] topic=${topic} messages=${messages.length}`);
-    } catch (error) {
-      this.logger.error(
-        `[Send FAILED] topic=${topic} - ${(error as Error).message}`,
-        (error as Error).stack,
-      );
-      throw error;
-    }
+  emit<T>(topic: string, message: T) {
+    return firstValueFrom(this.client.emit(topic, message));
+  }
+
+  send<TResponse, TRequest>(topic: string, message: TRequest) {
+    return firstValueFrom(this.client.send<TResponse, TRequest>(topic, message));
   }
 }
