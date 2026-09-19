@@ -1,4 +1,9 @@
-import { BadRequestException, Injectable, UnauthorizedException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  Logger,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { ERROR_MESSAGES } from 'src/data/constants';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
@@ -27,6 +32,11 @@ import { randomUUID } from 'node:crypto';
 import { checkUuidValid, type JwtUserRole } from '@packages/helpers';
 import { CurrentUser } from '@packages/decorators';
 import type { FacebookProfile, GoogleProfile } from '@packages/strategy';
+import { KafkaProducer } from '../kafka/kafka.producer';
+
+/** How long a forgot-password reset token stays valid — matches the copy in the reset email. */
+const RESET_PASSWORD_TOKEN_TTL_SECONDS = 300;
+const resetPasswordRedisKey = (jti: string) => `reset-password:${jti}`;
 
 function parseRefreshTokenPayload(value: unknown): JwtRefreshPayload {
   if (typeof value !== 'object' || value === null) {
@@ -44,10 +54,12 @@ function parseRefreshTokenPayload(value: unknown): JwtRefreshPayload {
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
   private readonly jwtTokensConfig: JwtTokensConfig;
   constructor(
     private readonly userService: UserService,
     private readonly jwtService: JwtService,
+    private readonly kafkaProducer: KafkaProducer,
     configService: ConfigService,
   ) {
     this.jwtTokensConfig = getJwtTokensConfig(configService);
@@ -230,13 +242,55 @@ export class AuthService {
     };
   }
 
-  // password reset requires the redis token store + email sender, both removed for now
-  forgotPasswordService(_forgotPasswordDto: ForgotPasswordDto): Promise<ForgotPasswordResponseDto> {
-    throw new BadRequestException(ERROR_MESSAGES.FEATURE_NOT_AVAILABLE);
+  // Reset token = a random jti stored in third-service's Redis (userId, 5 min TTL); the email
+  // itself is sent by third-service too. Both hops go over this service's own Kafka producer.
+  async forgotPasswordService(
+    forgotPasswordDto: ForgotPasswordDto,
+  ): Promise<ForgotPasswordResponseDto> {
+    const [user] = await this.userService.getUserByField({
+      field: 'email',
+      value: forgotPasswordDto.email,
+    });
+    if (!user) {
+      throw new BadRequestException(ERROR_MESSAGES.USER_NOT_FOUND);
+    }
+
+    const jti = randomUUID();
+    await this.kafkaProducer.send('redis.set', {
+      key: resetPasswordRedisKey(jti),
+      value: user.id,
+      ttlSeconds: RESET_PASSWORD_TOKEN_TTL_SECONDS,
+    });
+
+    await this.kafkaProducer.send('email.sendForgotPasswordMail', {
+      to: user.email,
+      resetToken: jti,
+      displayName: user.firstName,
+    });
+
+    return { ok: true };
   }
 
-  resetPasswordService(_resetPasswordDto: ResetPasswordDto): Promise<ResetPasswordResponseDto> {
-    throw new BadRequestException(ERROR_MESSAGES.FEATURE_NOT_AVAILABLE);
+  async resetPasswordService(
+    resetPasswordDto: ResetPasswordDto,
+  ): Promise<ResetPasswordResponseDto> {
+    const key = resetPasswordRedisKey(resetPasswordDto.jti);
+    const userId = await this.kafkaProducer.send<string | null, { key: string }>('redis.get', {
+      key,
+    });
+    if (!userId) {
+      throw new BadRequestException(ERROR_MESSAGES.INVALID_RESET_PASSWORD_TOKEN);
+    }
+
+    await this.updateUserPasswordService({ userId, password: resetPasswordDto.password });
+
+    // Best-effort cleanup: the password is already changed, so a delete failure here (token
+    // stays until its TTL expires) must not fail the response.
+    this.kafkaProducer
+      .emit('redis.del', { keys: [key] })
+      .catch((error: unknown) => this.logger.warn(`Failed to delete reset token ${key}`, error));
+
+    return { ok: true };
   }
 
   async updateUserPasswordService({ userId, password }: { userId: string; password: string }) {
