@@ -1,9 +1,4 @@
-import {
-  BadRequestException,
-  Injectable,
-  Logger,
-  UnauthorizedException,
-} from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import { ERROR_MESSAGES } from 'src/data/constants';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
@@ -37,6 +32,7 @@ import { KafkaProducer } from '../kafka/kafka.producer';
 /** How long a forgot-password reset token stays valid — matches the copy in the reset email. */
 const RESET_PASSWORD_TOKEN_TTL_SECONDS = 300;
 const resetPasswordRedisKey = (jti: string) => `reset-password:${jti}`;
+const loginSessionRedisKey = (userId: string) => `session:${userId}`;
 
 function parseRefreshTokenPayload(value: unknown): JwtRefreshPayload {
   if (typeof value !== 'object' || value === null) {
@@ -63,6 +59,24 @@ export class AuthService {
     configService: ConfigService,
   ) {
     this.jwtTokensConfig = getJwtTokensConfig(configService);
+  }
+
+  /**
+   * Fire-and-forget: persists the login session in third-service's Redis via the existing
+   * generic `redis.set` topic — key is `session:{userId}`, value is the raw refreshToken.
+   * TTL matches the refresh token's own lifetime. Not awaited by callers — a Kafka/Redis hiccup
+   * here must never fail the login response itself.
+   */
+  private emitLoginSessionCreated(userId: string, refreshToken: string): void {
+    this.kafkaProducer
+      .send('redis.set', {
+        key: loginSessionRedisKey(userId),
+        value: refreshToken,
+        ttlSeconds: this.jwtTokensConfig.refreshExpiresIn,
+      })
+      .catch((error: unknown) =>
+        this.logger.warn(`Failed to create login session for user ${userId}`, error),
+      );
   }
 
   // TODO: register tutor ...
@@ -135,6 +149,8 @@ export class AuthService {
       signRefreshToken(this.jwtService, { sub: user.id, email: user.email }, this.jwtTokensConfig),
     ]);
 
+    this.emitLoginSessionCreated(user.id, refreshToken);
+
     return {
       accessToken,
       refreshToken,
@@ -163,6 +179,8 @@ export class AuthService {
       signAccessToken(this.jwtService, payload, this.jwtTokensConfig),
       signRefreshToken(this.jwtService, { sub: user.id, email: user.email }, this.jwtTokensConfig),
     ]);
+
+    this.emitLoginSessionCreated(user.id, refreshToken);
 
     return {
       accessToken,
@@ -196,6 +214,8 @@ export class AuthService {
       signAccessToken(this.jwtService, payload, this.jwtTokensConfig),
       signRefreshToken(this.jwtService, { sub: user.id, email: user.email }, this.jwtTokensConfig),
     ]);
+
+    this.emitLoginSessionCreated(user.id, refreshToken);
 
     return {
       accessToken,
@@ -234,6 +254,8 @@ export class AuthService {
       signAccessToken(this.jwtService, payload, this.jwtTokensConfig),
       signRefreshToken(this.jwtService, { sub: user.id, email: user.email }, this.jwtTokensConfig),
     ]);
+
+    this.emitLoginSessionCreated(user.id, refreshToken);
 
     return {
       accessToken,
@@ -342,6 +364,9 @@ export class AuthService {
       signRefreshToken(this.jwtService, refreshPayload, this.jwtTokensConfig),
     ]);
 
+    // Renew the session in Redis with the new refresh token
+    this.emitLoginSessionCreated(user.id, refreshToken);
+
     return {
       accessToken,
       refreshToken,
@@ -349,11 +374,19 @@ export class AuthService {
     };
   }
 
-  // stateless logout: no server-side token blacklist without redis, client just discards the token
+  // Logout: delete the session from Redis so the gateway rejects subsequent requests with 401
   logoutService(@CurrentUser() user: Record<string, string>) {
     if (!user.id || !checkUuidValid({ data: user.id })) {
       throw new BadRequestException(ERROR_MESSAGES.INVALID_USER_ID);
     }
+
+    // Best-effort: if Redis delete fails, the session will expire via TTL anyway.
+    this.kafkaProducer
+      .emit('redis.del', { keys: [loginSessionRedisKey(user.id)] })
+      .catch((error: unknown) =>
+        this.logger.warn(`Failed to delete session for user ${user.id}`, error),
+      );
+
     return { ok: true };
   }
 }
