@@ -40,5 +40,5 @@ Run `bun run build` (or `bunx tsc --noEmit`) to confirm the module resolves and 
 
 ## Not for infra modules
 This scaffold is for domain feature modules. A module wrapping an external connection
-(rabbitmq) is `@Global()`, has no repository/controller, and exports its service(s)
+(`kafka`) is `@Global()`, has no repository/controller, and exports its service(s)
 directly — see the "Infra modules" note in `.claude/rules/nestjs-feature-pattern.md`.

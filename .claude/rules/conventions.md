@@ -28,8 +28,14 @@
   `accessToken`, `refreshToken`, etc.) and truncating logged JSON at 1000 chars. If a new field
   name carrying a secret is introduced (e.g. a new `*Secret`/`*Key` DTO field), add it to
   `SENSITIVE_KEYS` rather than relying on truncation to hide it.
-- **RabbitMQ pass/fail logging**: `RabbitMQProducer.publish` and `RabbitMQConsumer.subscribe`
-  (`src/features/rabbitmq/*`) log an explicit `[Publish OK/FAILED]` / `[Consume OK/FAILED]` line
-  per message (with routing key/queue and, on failure, the error + stack) — this is built into
-  the shared producer/consumer classes, so any feature that publishes or subscribes gets pass/fail
-  visibility for free; don't add ad-hoc logging around individual `publish`/`subscribe` call sites.
+- **Kafka pass/fail logging**: `KafkaProducer.send`/`.emit` (`src/features/kafka/kafka.producer.ts`)
+  already log `[SEND]`/`[EMIT]` on dispatch and `[SEND FAILED]` on a `.send()` rejection, each
+  with the topic + `correlationId`/`traceId` — this is built into the shared producer, so any
+  feature that calls it gets pass/fail visibility for free; don't add ad-hoc logging around
+  individual `send`/`emit` call sites. RabbitMQ (and its `[Publish OK/FAILED]`/`[Consume OK/
+  FAILED]` logging) was fully replaced by Kafka — there is no `rabbitmq` feature left.
+- **Non-blocking side effects**: when a Kafka call is for a side effect that must never fail the
+  caller's main flow (best-effort cleanup, session/audit tracking), don't `await` it — fire the
+  promise and attach `.catch((error) => this.logger.warn(...))` so a Kafka/downstream hiccup is
+  logged but never bubbles into the caller's response. See
+  `AuthService.emitLoginSessionCreated`/the `redis.del` cleanup in `resetPasswordService`.
