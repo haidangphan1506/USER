@@ -34,6 +34,8 @@ export const KAFKA_SERVER_TOPICS: string[] = [
   'kafka.ping',
   'kafka.user',
   'kafka.user.error',
+  'kafka.send',
+  'health.postgres',
 ];
 
 /**
